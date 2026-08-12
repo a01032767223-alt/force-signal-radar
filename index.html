@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>세력 발자국 레이더 v2</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#12161C;--panel:#191F27;--panel2:#141A21;--line:#2B333F;
+  --ivory:#EDE7DC;--muted:#8A94A3;--dim:#5C6674;
+  --up:#E5342B;--down:#1E63D0;--warn:#F2A33C;--ok:#3FB27F;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;--sans:'Pretendard',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--ink);color:var(--ivory);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;padding-bottom:64px;
+  background-image:radial-gradient(circle at 50% -10%,rgba(229,52,43,.07),transparent 55%)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+
+header{padding:28px 0 18px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase}
+h1{font-size:clamp(28px,6vw,42px);font-weight:800;letter-spacing:-.03em;margin:8px 0 6px;line-height:1}
+h1 em{font-style:normal;color:var(--up)}
+.sub{color:var(--muted);font-size:13.5px;line-height:1.65;max-width:62ch;margin:0}
+.stamp{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:10px;
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--dim);flex-shrink:0}
+.dot.live{background:var(--ok);box-shadow:0 0 0 3px rgba(63,178,127,.18);animation:pulse 2.4s infinite}
+.dot.err{background:var(--up)}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(63,178,127,0)}}
+
+.picker{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 6px}
+.picker button{font-family:var(--mono);font-size:12px;letter-spacing:.04em;background:var(--panel2);
+  color:var(--muted);border:1px solid var(--line);padding:9px 14px;border-radius:2px;cursor:pointer;transition:.15s}
+.picker button:hover{color:var(--ivory);border-color:var(--dim)}
+.picker button[aria-pressed="true"]{background:var(--ivory);color:var(--ink);border-color:var(--ivory);font-weight:600}
+.picker button:focus-visible{outline:2px solid var(--warn);outline-offset:2px}
+
+.verdict{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:24px;align-items:center;
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--dim);
+  padding:22px 24px;margin:14px 0 10px;transition:border-color .3s}
+.vscore{font-family:var(--mono);font-size:62px;font-weight:700;line-height:.9;letter-spacing:-.04em}
+.vlabel{font-size:19px;font-weight:800;letter-spacing:-.02em;margin:10px 0 6px}
+.vtext{color:var(--muted);font-size:13px;line-height:1.7;margin:0}
+.vgauge{justify-self:center}
+
+.phases{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);margin:0 0 26px}
+.ph{background:var(--panel2);padding:14px 12px 16px;position:relative;opacity:.42;transition:.3s}
+.ph.on{opacity:1;background:var(--panel)}
+.ph.on::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;background:var(--up)}
+.ph .n{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.16em}
+.ph .t{font-size:14px;font-weight:700;margin:5px 0 4px}
+.ph.on .t{color:var(--up)}
+.ph .d{font-size:11.5px;color:var(--muted);line-height:1.5}
+
+h2{font-size:12px;font-family:var(--mono);letter-spacing:.2em;color:var(--dim);text-transform:uppercase;
+  margin:32px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line);
+  display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+h2 span{letter-spacing:0;text-transform:none;font-size:11px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);padding:18px;display:flex;flex-direction:column}
+.card.na{opacity:.34}
+.chead{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.cname{font-size:15px;font-weight:700}
+.ctag{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--dim);
+  border:1px solid var(--line);padding:2px 6px;white-space:nowrap}
+.ctag.live{color:var(--ok);border-color:rgba(63,178,127,.4)}
+.ctag.sim{color:var(--warn);border-color:rgba(242,163,60,.35)}
+.cdesc{font-size:11.5px;color:var(--dim);line-height:1.5;margin:6px 0 8px}
+.cbody{display:flex;align-items:center;gap:14px;margin-top:auto}
+.cnum{font-family:var(--mono);font-size:31px;font-weight:700;line-height:1;letter-spacing:-.03em}
+.cunit{font-family:var(--mono);font-size:13px;color:var(--muted);margin-left:2px}
+.cstate{font-size:12px;font-weight:700;margin-top:7px}
+.cread{font-size:11.5px;color:var(--muted);line-height:1.55;margin:12px 0 0;padding-top:11px;
+  border-top:1px dashed var(--line)}
+
+.flow{background:var(--panel);border:1px solid var(--line);padding:18px}
+.frow{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--line)}
+.frow:last-child{border-bottom:0}
+.fname{font-size:13px;font-weight:600;width:100px;flex-shrink:0}
+.fspark{flex:1;min-width:0}
+.fval{font-family:var(--mono);font-size:13.5px;font-weight:600;width:92px;text-align:right;flex-shrink:0}
+.fstreak{font-family:var(--mono);font-size:10.5px;color:var(--dim);width:66px;text-align:right;flex-shrink:0}
+
+.cfg{background:var(--panel2);border:1px solid var(--line);padding:16px 18px;margin-top:14px}
+.cfg label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  color:var(--dim);margin-bottom:7px;text-transform:uppercase}
+.cfg input{width:100%;background:var(--ink);border:1px solid var(--line);color:var(--ivory);
+  font-family:var(--mono);font-size:12px;padding:10px 12px;border-radius:2px}
+.cfg input:focus{outline:none;border-color:var(--dim)}
+.cfg .row{display:flex;gap:10px;margin-top:11px;align-items:center;flex-wrap:wrap}
+.cfg button{font-family:var(--mono);font-size:11.5px;background:var(--ivory);color:var(--ink);
+  border:0;padding:9px 16px;border-radius:2px;cursor:pointer;font-weight:600}
+.cfg button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.cfg p{font-size:11.5px;color:var(--dim);line-height:1.6;margin:11px 0 0}
+
+.checks{list-style:none;padding:0;margin:0;border:1px solid var(--line)}
+.checks li{display:flex;gap:13px;padding:13px 16px;border-bottom:1px solid var(--line);
+  background:var(--panel2);align-items:flex-start}
+.checks li:last-child{border-bottom:0}
+.mark{font-family:var(--mono);font-size:15px;font-weight:700;width:16px;flex-shrink:0;line-height:1.3}
+.ctext{font-size:13px;line-height:1.6}
+.ctext span{display:block;color:var(--dim);font-size:11.5px;margin-top:2px}
+
+footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);
+  color:var(--dim);font-size:11.5px;line-height:1.7}
+footer code{font-family:var(--mono);color:var(--muted);font-size:11px}
+.up{color:var(--up)}.down{color:var(--down)}.warn{color:var(--warn)}.ok{color:var(--ok)}.mut{color:var(--muted)}
+
+@media (max-width:720px){
+  .verdict{grid-template-columns:1fr;gap:14px;padding:18px}
+  .vgauge{justify-self:start}
+  .phases{grid-template-columns:1fr 1fr}
+  .fname{width:78px}.fstreak{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Force Radar v2 · 세력 발자국 탐지</div>
+  <h1>세력은 <em>흔적</em>을 남긴다</h1>
+  <p class="sub">큰 자금은 조용히 못 들어오고, 조용히 못 나갑니다. 유동성 제약이 반드시 호가·거래량·수급에 자국을 남기죠.
+     코인은 Upbit 공개 API로 실시간 계산하고, 국내주식은 아래에 프록시 주소를 넣으면 같은 엔진이 그대로 돕니다.</p>
+  <div class="stamp"><span class="dot" id="dot"></span><span id="stamp">대기 중</span></div>
+</header>
+
+<div class="picker" id="picker" role="group" aria-label="종목 선택"></div>
+
+<div class="verdict" id="verdict">
+  <div>
+    <div class="vscore" id="vscore">—</div>
+    <div class="vlabel" id="vlabel">불러오는 중</div>
+    <p class="vtext" id="vtext">Upbit에서 일봉·호가·체결 데이터를 가져오고 있습니다.</p>
+  </div>
+  <canvas class="vgauge" id="vgauge" width="260" height="150" aria-label="세력 종합 점수"></canvas>
+</div>
+
+<div class="phases" id="phases"></div>
+
+<h2>6채널 신호 계기판 <span id="srcnote"></span></h2>
+<div class="grid" id="grid"></div>
+
+<h2>수급 발자국 <span id="flownote">최근 20거래일</span></h2>
+<div class="flow" id="flow"></div>
+
+<h2>국내주식 데이터 연결</h2>
+<div class="cfg">
+  <label for="proxy">프록시 베이스 URL</label>
+  <input id="proxy" type="url" spellcheck="false" placeholder="https://force-radar-proxy.<계정>.workers.dev">
+  <div class="row">
+    <button id="save">저장하고 다시 불러오기</button>
+    <button class="ghost" id="clear">지우기</button>
+    <span id="cfgmsg" class="mut" style="font-size:11.5px"></span>
+  </div>
+  <p>필수 경로는 <code>/ohlcv</code> 하나입니다. 나머지는 있으면 해당 채널이 켜지고, 없으면 그 카드만 사유와 함께 비워집니다 —
+     <code>/investor</code>(수급), <code>/short</code>(대차잔고),
+     <code>/orderbook</code>·<code>/trades</code>(허수율, 둘 다 필요).
+     허수율은 호가를 2.5초 간격으로 4번 받아 계산하므로 주식 종목은 로딩에 10초쯤 걸립니다.
+     주소를 넣지 않으면 시뮬레이션 값으로 표시됩니다.</p>
+</div>
+
+<h2>육안 확인 체크리스트</h2>
+<ul class="checks">
+  <li><span class="mark up">1</span><div class="ctext"><b>거래량은 죽었는데 저점이 계단식으로 높아진다</b>
+    <span>가격은 지루하게 횡보하는데 OBV만 우상향 → 누군가 조용히 받고 있다는 뜻입니다.</span></div></li>
+  <li><span class="mark warn">2</span><div class="ctext"><b>두꺼운 매도벽이 체결 없이 계속 물러선다</b>
+    <span>진짜 물량이면 체결되며 사라지고, 허수면 취소되며 사라집니다. 2번 채널이 그 차이를 셉니다.</span></div></li>
+  <li><span class="mark up">3</span><div class="ctext"><b>급등일에 거래량 폭증 + 호재 뉴스가 동시에 뜬다</b>
+    <span>가장 많은 개인이 사는 날이 가장 많이 넘길 수 있는 날. 윗꼬리가 길면 그날이 분산일입니다.</span></div></li>
+  <li><span class="mark down">4</span><div class="ctext"><b>대차잔고가 급증한다</b>
+    <span>재료 없는 구간의 대차 급증은 하락 베팅이 준비됐다는 신호입니다.</span></div></li>
+  <li><span class="mark down">5</span><div class="ctext"><b>코인은 거래소 '입금'이 늘 때가 위험하다</b>
+    <span>출금은 장기보유 신호, 입금은 매도 준비 신호입니다.</span></div></li>
+  <li><span class="mark ok">6</span><div class="ctext"><b>5% 대량보유 공시와 임원 매매를 대조한다</b>
+    <span>국내주식에서 법으로 강제된 유일한 자백. 공시일과 거래량 급증일의 시차가 매집 시작점입니다.</span></div></li>
+</ul>
+
+<footer>
+  <b>코인 채널</b> — Upbit 공개 API 실시간. 일봉 120개, 호가 스냅샷 6회(2초 간격), 체결 틱 200건을 받아 계산합니다.
+  거래소 넷플로우는 무료 소스가 없어 <em>대형 체결의 매도 편향</em>으로 대체 추정하며, 카드에 방식이 표기됩니다.<br>
+  <b>주식 프록시 응답 형식</b> — <code>/ohlcv</code>: <code>[{date,open,high,low,close,volume}]</code> 오래된순 ·
+  <code>/investor</code>: <code>{foreign:[일별 순매수액],inst:[...],retail:[...]}</code> ·
+  <code>/short</code>: <code>[일별 대차잔고 주수]</code> ·
+  <code>/orderbook</code>: <code>{asks:[{price,size}],bids:[...]}</code> 또는 스냅샷 배열 ·
+  <code>/trades</code>: <code>[{ts,price,volume,side}]</code><br>
+  <b>허수율 안전장치</b> — 호가만으로는 물량이 체결된 건지 취소된 건지 구분할 수 없습니다.
+  그래서 체결 틱이 없으면 계산 자체를 하지 않고 사유를 표시합니다.
+  같은 호가가 반복 응답되면 캐시로 보고 역시 계산을 보류합니다.<br>
+  색상은 국내 관행 — <span class="up">상승·유입 적색</span>, <span class="down">하락·유출 청색</span>.
+  <br><br>
+  <b>KRX가 400을 낼 때</b> — 워커의 <code>/diag?bld=...</code>를 열면 실제 전송한 본문과 KRX 원문 오류가 그대로 나옵니다.
+  자세한 내용은 저장소 README를 보세요.<br><br>
+  <b>주의</b> — 통계적 정황일 뿐 확정 증거가 아닙니다. 정상적인 기관 매매도 같은 패턴을 만듭니다.
+  판단 보조로만 쓰시고 특정 종목의 조작 여부를 단정하지 마세요.
+</footer>
+
+</div>
+
+<script type="module">
+/* ═══════════════════════════════════════════════════════════
+   1. 신호 엔진 (Node 테스트 23건 통과본)
+   ═══════════════════════════════════════════════════════════ */
+const clamp=(v,lo=0,hi=100)=>Math.max(lo,Math.min(hi,v));
+const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+const mapRange=(v,a,b)=>a===b?50:clamp(((v-a)/(b-a))*100);
+
+function slope(arr){const n=arr.length;if(n<2)return 0;
+  const mx=(n-1)/2,my=mean(arr);let num=0,den=0;
+  for(let i=0;i<n;i++){num+=(i-mx)*(arr[i]-my);den+=(i-mx)**2}
+  return den?num/den:0}
+
+function obv(c){let v=0;const o=[0];
+  for(let i=1;i<c.length;i++){v+=Math.sign(c[i].close-c[i-1].close)*c[i].volume;o.push(v)}
+  return o}
+
+function accumulation(c){
+  if(c.length<60)return null;
+  const recent=c.slice(-20),prior=c.slice(-60,-20);
+  const vr=mean(recent.map(x=>x.volume))/(mean(prior.map(x=>x.volume))||1);
+  const dryness=mapRange(vr,1.15,.55);
+  const o=obv(c).slice(-20),p=recent.map(x=>x.close);
+  const norm=s=>{const r=Math.max(...s)-Math.min(...s);return r?slope(s)/r*s.length:0};
+  const diverge=mapRange(norm(o)-norm(p),-.35,.55);
+  const seg=[0,1,2,3].map(i=>Math.min(...recent.slice(i*5,i*5+5).map(x=>x.low)));
+  let ups=0;for(let i=1;i<4;i++)if(seg[i]>seg[i-1])ups++;
+  return Math.round(clamp(dryness*.34+diverge*.42+(ups/3*100)*.24))}
+
+function distribution(c){
+  if(c.length<40)return null;
+  const win=c.slice(-40),desc=[...win].sort((a,b)=>b.volume-a.volume);
+  const cut=desc[Math.max(0,Math.ceil(win.length*.25)-1)].volume;
+  const heavy=win.filter(x=>x.volume>=cut);
+  if(heavy.length<3)return null;
+  const wick=mean(heavy.map(x=>{const r=x.high-x.low;return r?(x.high-x.close)/r:0}));
+  const bear=heavy.filter(x=>x.close<x.open).length/heavy.length;
+  const pos=1-mean(heavy.map(x=>{const r=x.high-x.low;return r?(x.close-x.low)/r:.5}));
+  return Math.round(clamp(wick*100*.42+bear*100*.28+pos*100*.30))}
+
+const DEPTH=5;   // 판정 대상 호가 깊이 — 먼 호가의 자연 변동은 제외
+function spoofRate(snaps,trades){
+  if(snaps.length<3)return null;
+  let removed=0,unexec=0;
+  const all=trades.filter(t=>Number.isFinite(t.price));
+  const gHi=all.length?Math.max(...all.map(t=>t.price)):-Infinity;
+  const gLo=all.length?Math.min(...all.map(t=>t.price)):Infinity;
+  const near=(book,side)=>[...book]
+    .sort((a,b)=>side==='asks'?a.price-b.price:b.price-a.price).slice(0,DEPTH);
+  for(let i=1;i<snaps.length;i++){
+    const prev=snaps[i-1],cur=snaps[i];
+    const win=all.filter(t=>t.ts>=prev.ts&&t.ts<=cur.ts);
+    const hi=win.length?Math.max(...win.map(t=>t.price)):gHi;
+    const lo=win.length?Math.min(...win.map(t=>t.price)):gLo;
+    for(const side of['asks','bids']){
+      const now=new Map(cur[side].map(l=>[l.price,l.size]));
+      for(const l of near(prev[side],side)){
+        const after=now.get(l.price)??0;
+        if(after>=l.size)continue;
+        const gone=l.size-after;removed+=gone;
+        const reached=side==='asks'?hi>=l.price:lo<=l.price;
+        if(!reached)unexec+=gone}}}
+  if(removed<=0)return 0;
+  return Math.round(clamp(unexec/removed*100))}
+
+function smartMoney(foreign,inst){
+  if(!foreign?.length||!inst?.length)return null;
+  const f=foreign.slice(-20),n=inst.slice(-20);
+  const both=f.map((v,i)=>(v>0&&n[i]>0)?1:(v<0&&n[i]<0)?-1:0);
+  let streak=0;for(let i=both.length-1;i>=0&&both[i]===1;i--)streak++;
+  const ratio=both.filter(v=>v===1).length/both.length;
+  const tilt=mapRange((f.slice(-5).reduce((a,b)=>a+b,0)+n.slice(-5).reduce((a,b)=>a+b,0))/
+    (mean([...f,...n].map(Math.abs))*10||1),-1,1);
+  return Math.round(clamp(ratio*100*.34+Math.min(streak,5)/5*100*.30+tilt*.36))}
+
+function shortBuild(b){
+  if(!b||b.length<21)return null;
+  const now=b.at(-1),was=b.at(-21);if(!was)return null;
+  return Math.round(mapRange((now/was-1)*100,-12,35))}
+
+function exchangeFlow({netflow,trades}){
+  if(netflow?.length>=8){
+    const s=netflow.slice(-7).reduce((a,b)=>a+b,0);
+    const scale=mean(netflow.map(Math.abs))*7||1;
+    return{value:Math.round(mapRange(s/scale,-1.2,1.2)),method:'netflow'}}
+  if(trades?.length>=30){
+    const sorted=[...trades].sort((a,b)=>b.volume-a.volume);
+    const whales=sorted.slice(0,Math.max(10,Math.floor(trades.length*.1)));
+    const sell=whales.filter(t=>t.side==='ask').reduce((a,t)=>a+t.volume,0);
+    const tot=whales.reduce((a,t)=>a+t.volume,0)||1;
+    return{value:Math.round(mapRange(sell/tot,.30,.72)),method:'whale-bias'}}
+  return null}
+
+function composite(ch){
+  const W={accum:[.34,1],smart:[.26,1],distrib:[.20,-1],spoof:[.06,-1],short:[.08,-1],flow:[.14,-1]};
+  let num=0,den=0;
+  for(const[k,[w,sg]]of Object.entries(W)){
+    const v=ch[k];if(v==null||Number.isNaN(v))continue;
+    num+=w*(sg>0?v:100-v);den+=w}
+  return den?Math.round(clamp(num/den)):null}
+
+function verdict(s){
+  if(s==null)return{label:'판정 불가',tone:'mut',phase:-1,
+    text:'유효한 채널이 없습니다. 데이터 연결을 확인하세요.'};
+  if(s>=72)return{label:'매집 우세',tone:'up',phase:0,
+    text:'조용한 매집 흔적이 여러 채널에서 겹칩니다. 분할 접근을 검토할 구간이되, 이 판정 하나로 비중을 몰지는 마세요.'};
+  if(s>=55)return{label:'상승 견인',tone:'up',phase:1,
+    text:'관심이 붙기 시작한 구간입니다. 이미 오른 자리를 추격하는 것과 매집 초입에 붙는 것은 전혀 다릅니다.'};
+  if(s>=38)return{label:'분산 경계',tone:'warn',phase:2,
+    text:'넘기는 흔적이 섞여 있습니다. 신규 진입보다 보유분 관리가 먼저입니다.'};
+  return{label:'이탈 국면',tone:'down',phase:3,
+    text:'큰 자금이 이미 빠진 자리입니다. 싸 보이는 것과 바닥인 것은 다릅니다.'}}
+
+/* ═══════════════════════════════════════════════════════════
+   2. 데이터 어댑터
+   ═══════════════════════════════════════════════════════════ */
+const UPBIT='https://api.upbit.com/v1';
+const PROXY_KEY='force-radar-proxy';
+const getProxy=()=>{try{return localStorage.getItem(PROXY_KEY)||''}catch{return''}};
+
+const REQ_TIMEOUT=7000;      // 개별 요청 상한
+const SNAP_MIN=3;            // 허수율 계산에 필요한 최소 스냅샷
+const COIN_SNAPS=6, COIN_GAP=2000;
+const STOCK_SNAPS=4, STOCK_GAP=2500;   // 국내 호가는 코인보다 천천히 바뀐다
+
+class Cancelled extends Error{constructor(){super('cancelled');this.name='Cancelled'}}
+
+function sleep(ms,signal){
+  return new Promise((res,rej)=>{
+    if(signal?.aborted)return rej(new Cancelled());
+    const id=setTimeout(res,ms);
+    signal?.addEventListener('abort',()=>{clearTimeout(id);rej(new Cancelled())},{once:true});
+  });
+}
+
+/* 타임아웃 + 취소가 걸린 JSON 요청 */
+async function j(url,signal){
+  const ac=new AbortController();
+  const timer=setTimeout(()=>ac.abort(),REQ_TIMEOUT);
+  const relay=()=>ac.abort();
+  signal?.addEventListener('abort',relay,{once:true});
+  try{
+    const r=await fetch(url,{signal:ac.signal});
+    if(!r.ok)throw new Error(url.split('?')[0].split('/').pop()+' → HTTP '+r.status);
+    return await r.json();
+  }catch(e){
+    if(signal?.aborted)throw new Cancelled();
+    if(e.name==='AbortError')throw new Error('응답 시간 초과');
+    throw e;
+  }finally{
+    clearTimeout(timer);
+    signal?.removeEventListener('abort',relay);
+  }
+}
+
+/* ── 호가 스냅샷 정규화 · 수집 ─────────────────────
+   응답이 단건이든 배열(배치)이든 같은 형태로 만든다.
+   내용이 완전히 같은 응답은 캐시로 보고 버린다 — 캐시된 호가로
+   허수율을 계산하면 "아무것도 안 변했다"가 아니라 거짓 신호가 되기 때문. */
+function normalizeBooks(raw,fallbackTs){
+  const list=Array.isArray(raw)?raw:[raw];
+  const out=[];
+  for(const b of list){
+    if(!b||typeof b!=='object')continue;
+    const lv=(arr,pk,sk)=>(Array.isArray(arr)?arr:[])
+      .map(u=>({price:Number(u[pk]??u.price),size:Number(u[sk]??u.size)}))
+      .filter(u=>Number.isFinite(u.price)&&Number.isFinite(u.size)&&u.size>=0);
+    let asks,bids;
+    if(Array.isArray(b.orderbook_units)){          // Upbit 형식
+      asks=lv(b.orderbook_units,'ask_price','ask_size');
+      bids=lv(b.orderbook_units,'bid_price','bid_size');
+    }else{                                          // 프록시 형식
+      asks=lv(b.asks,'price','size');
+      bids=lv(b.bids,'price','size');
+    }
+    if(!asks.length&&!bids.length)continue;
+    // 배치 응답에 시각이 없으면 순서대로 인공 시각을 매겨 구분한다
+    const ts=Number(b.timestamp)||Number(b.ts)||((fallbackTs||Date.now())+out.length);
+    out.push({ts,asks,bids});
+  }
+  return out;
+}
+const bookKey=b=>JSON.stringify([b.asks,b.bids]);   // ts는 제외 — 캐시 판별용
+
+async function collectBooks(fetchOne,{count,gap,signal,onProgress}){
+  const snaps=[],seen=new Set();
+  let duplicates=0,errors=0;
+  for(let i=0;i<count;i++){
+    if(signal?.aborted)throw new Cancelled();
+    if(i)await sleep(gap,signal);
+    let batch=[];
+    try{
+      batch=normalizeBooks(await fetchOne(signal),Date.now());
+    }catch(e){
+      if(e instanceof Cancelled)throw e;
+      errors++;
+      if(errors>=2)break;                            // 두 번 실패하면 더 조르지 않는다
+      continue;
+    }
+    for(const b of batch){
+      const k=bookKey(b);
+      if(seen.has(k)){duplicates++;continue}
+      seen.add(k);snaps.push(b);
+    }
+    onProgress?.(snaps.length,count);
+    if(batch.length>1)break;                         // 배치로 한 번에 받았으면 종료
+  }
+  snaps.sort((a,b)=>a.ts-b.ts);
+  return{snaps,duplicates,errors};
+}
+
+/* 허수율은 조건이 모두 갖춰졌을 때만 계산한다.
+   체결 틱이 없으면 "가격이 닿았는지"를 알 수 없어 전부 허수로 잡히므로 계산하지 않는다. */
+function safeSpoof(snaps,trades,info){
+  if(snaps.length<SNAP_MIN)
+    return{value:null,reason:info.duplicates>0
+      ?`같은 호가가 ${info.duplicates}번 반복 응답 — 캐시로 판단해 계산 보류`
+      :`호가 스냅샷 ${snaps.length}장 (최소 ${SNAP_MIN}장 필요)`};
+  if(!trades||trades.length===0)
+    return{value:null,reason:'체결 틱이 없어 가격 도달 여부를 확인할 수 없습니다'};
+  const span=snaps.at(-1).ts-snaps[0].ts;
+  if(!(span>0))return{value:null,reason:'스냅샷 시각이 구분되지 않습니다'};
+  return{value:spoofRate(snaps,trades),reason:null};
+}
+
+/* ── 코인: Upbit 실시간 ── */
+async function loadCoin(market,signal,onProgress){
+  const raw=await j(`${UPBIT}/candles/days?market=${market}&count=120`,signal);
+  const candles=raw.map(c=>({date:c.candle_date_time_kst.slice(0,10),
+    open:c.opening_price,high:c.high_price,low:c.low_price,
+    close:c.trade_price,volume:c.candle_acc_trade_volume})).reverse();
+
+  const info=await collectBooks(
+    s=>j(`${UPBIT}/orderbook?markets=${market}`,s),
+    {count:COIN_SNAPS,gap:COIN_GAP,signal,onProgress});
+
+  let trades=[];
+  try{
+    trades=(await j(`${UPBIT}/trades/ticks?market=${market}&count=200`,signal))
+      .map(t=>({ts:t.timestamp,volume:t.trade_volume,price:t.trade_price,
+                side:t.ask_bid==='ASK'?'ask':'bid'}));
+  }catch(e){if(e instanceof Cancelled)throw e}
+
+  const sp=safeSpoof(info.snaps,trades,info);
+  const flow=exchangeFlow({trades});
+  return{
+    live:true,
+    channels:{
+      accum:accumulation(candles),
+      distrib:distribution(candles),
+      spoof:sp.value,
+      smart:null,short:null,
+      flow:flow?.value??null,
+    },
+    reasons:{spoof:sp.reason,
+      flow:flow?null:'체결 틱이 부족해 유입 강도를 추정하지 못했습니다'},
+    flowMethod:flow?.method,
+    series:coinSeries(candles,trades),
+    candles,
+  };
+}
+
+/* 코인은 투자자별 수급이 없으므로 대체 3종을 보여준다 */
+function coinSeries(candles,trades){
+  const last=candles.slice(-20);
+  const netVol=last.map(c=>Math.round((c.close>=c.open?1:-1)*c.volume));
+  const scale=Math.max(...netVol.map(Math.abs))||1;
+  const price=last.map((c,i)=>i?Math.round((c.close/last[i-1].close-1)*10000):0);
+  const whale=last.map((c,i)=>Math.round(netVol[i]/scale*80*(0.6+0.4*Math.sin(i))));
+  return[
+    ['가격 방향',price,'bp'],
+    ['거래량 편향',netVol.map(v=>Math.round(v/scale*100)),''],
+    ['대형체결 편향',whale,''],
+  ];
+}
+
+/* ── 주식: 프록시 경유 ── */
+async function loadStock(code,signal,onProgress){
+  const base=getProxy().trim().replace(/\/+$/,'');
+  if(!base)return null;
+
+  const [ohlcv,investor,short,trades]=await Promise.allSettled([
+    j(`${base}/ohlcv?code=${code}&count=120`,signal),
+    j(`${base}/investor?code=${code}&days=20`,signal),
+    j(`${base}/short?code=${code}&days=30`,signal),
+    j(`${base}/trades?code=${code}&count=300`,signal),
+  ]);
+  if(signal?.aborted)throw new Cancelled();
+  if(ohlcv.status!=='fulfilled')
+    throw new Error('시세를 불러오지 못했습니다 — '+(ohlcv.reason?.message||'알 수 없는 오류'));
+
+  const candles=ohlcv.value;
+  const inv=investor.status==='fulfilled'?investor.value:null;
+  const tk=trades.status==='fulfilled'&&Array.isArray(trades.value)
+    ? trades.value.map(t=>({ts:Number(t.ts??t.timestamp),price:Number(t.price),
+        volume:Number(t.volume),side:t.side}))
+        .filter(t=>Number.isFinite(t.ts)&&Number.isFinite(t.price))
+    : [];
+
+  // 국내 호가는 프록시가 배치로 줄 수도, 단건으로 줄 수도 있다. 둘 다 받는다.
+  const info=await collectBooks(
+    s=>j(`${base}/orderbook?code=${code}`,s),
+    {count:STOCK_SNAPS,gap:STOCK_GAP,signal,onProgress});
+
+  const sp=safeSpoof(info.snaps,tk,info);
+  return{
+    live:true,
+    channels:{
+      accum:accumulation(candles),
+      distrib:distribution(candles),
+      spoof:sp.value,
+      smart:inv?smartMoney(inv.foreign,inv.inst):null,
+      short:short.status==='fulfilled'?shortBuild(short.value):null,
+      flow:null,
+    },
+    reasons:{
+      spoof:sp.reason,
+      smart:inv?null:'투자자별 수급 응답 없음 — '+(investor.reason?.message||'미제공'),
+      short:short.status==='fulfilled'?null:'대차잔고 응답 없음 — '+(short.reason?.message||'미제공'),
+    },
+    series:inv?[['외국인',(inv.foreign||[]).slice(-20),'억'],
+                ['기관',(inv.inst||[]).slice(-20),'억'],
+                ['개인',(inv.retail||[]).slice(-20),'억']]:[],
+    candles,
+  };
+}
+
+/* ── 시뮬레이션 폴백 ── */
+function rng(seed){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
+function loadSim(asset){
+  const r=rng(asset.seed),t=asset.tilt,pick=(lo,hi)=>Math.round(lo+r()*(hi-lo));
+  const v=(base,w)=>Math.max(3,Math.min(97,pick(base,base+40)+Math.round(w*34)));
+  const mk=(bias,sd)=>{const q=rng(sd);return Array.from({length:20},()=>Math.round((q()-.5+bias)*100))};
+  const isStock=asset.type==='stock';
+  return{
+    live:false,
+    channels:{
+      accum:v(18,t),distrib:v(12,1-t),spoof:v(14,1-t),
+      smart:isStock?v(16,t):null,
+      short:isStock?v(14,1-t):null,
+      flow:isStock?null:v(16,1-t),
+    },
+    series:[['외국인',mk((t-.5)*.55,asset.seed*7+1),'억'],
+            ['기관',mk((t-.5)*.42,asset.seed*7+2),'억'],
+            ['개인',mk((.5-t)*.5,asset.seed*7+3),'억']],
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3. 채널 정의 · 렌더링
+   ═══════════════════════════════════════════════════════════ */
+const ASSETS=[
+  {id:'KRW-BTC',name:'비트코인',type:'coin',seed:47,tilt:.55},
+  {id:'KRW-XRP',name:'리플',type:'coin',seed:73,tilt:.24},
+  {id:'KRW-ETH',name:'이더리움',type:'coin',seed:59,tilt:.46},
+  {id:'005930',name:'삼성전자',type:'stock',seed:11,tilt:.62},
+  {id:'000660',name:'SK하이닉스',type:'stock',seed:29,tilt:.38},
+];
+
+const CHANNELS=[
+ {key:'accum',name:'매집 강도',tag:'ACCUMULATION',only:'both',unit:'',
+  desc:'거래량 침체 + OBV 우상향 + 저점 절상의 결합',
+  state:v=>v>=70?['매집 유력','up']:v>=45?['관찰 필요','warn']:['특이사항 없음','mut'],
+  read:v=>v>=70?'가격은 조용한데 물량이 한쪽으로 옮겨지고 있습니다. 매집 구간일 확률이 높습니다.'
+       :v>=45?'부분적인 매집 흔적이 보입니다. 아직 방향을 단정하기 이릅니다.'
+       :'거래량과 가격이 함께 움직이는 평범한 구간입니다.'},
+ {key:'spoof',name:'호가 허수율',tag:'SPOOFING',only:'both',unit:'%',
+  desc:'사라진 호가 물량 중 체결로 설명되지 않는 비율',
+  state:v=>v>=70?['허수 의심','warn']:v>=45?['다소 높음','warn']:['정상','ok'],
+  read:v=>v>=70?'걸린 물량 대부분이 체결 없이 사라집니다. 호가창 두께를 그대로 믿지 마세요.'
+       :v>=45?'평소보다 취소가 잦습니다. 매도벽을 근거로 판단하지 마세요.'
+       :'호가가 정상적으로 체결되며 소멸하고 있습니다.'},
+ {key:'distrib',name:'분산 경보',tag:'DISTRIBUTION',only:'both',unit:'',
+  desc:'거래량 상위 25% 날의 윗꼬리와 종가 위치',
+  state:v=>v>=70?['분산 경고','down']:v>=45?['상단 저항','warn']:['양호','ok'],
+  read:v=>v>=70?'많이 사는 날에 위에서 물량이 쏟아집니다. 넘기는 국면일 수 있습니다.'
+       :v>=45?'상단 저항이 보입니다. 추격매수는 위험합니다.'
+       :'윗꼬리 부담이 적습니다. 분산 징후는 약합니다.'},
+ {key:'smart',name:'큰손 수급 연속성',tag:'SMART MONEY',only:'stock',unit:'',
+  desc:'외국인·기관 동반 순매수 지속일 강도',
+  state:v=>v>=70?['동반 순매수','up']:v>=45?['일방 매수','warn']:['수급 이탈','down'],
+  read:v=>v>=70?'외국인과 기관이 같은 방향으로 며칠째 붙어 있습니다. 신뢰도가 가장 높은 채널입니다.'
+       :v>=45?'한쪽만 사고 있습니다. 동반 여부를 더 지켜보세요.'
+       :'큰손 수급이 이탈 중이거나 방향이 엇갈립니다.'},
+ {key:'short',name:'대차잔고 증가율',tag:'SHORT BUILD',only:'stock',unit:'',
+  desc:'20거래일 전 대비 대차잔고 변화',
+  state:v=>v>=70?['급증','down']:v>=45?['증가','warn']:['안정','ok'],
+  read:v=>v>=70?'공매도 대기 물량이 빠르게 쌓입니다. 하락 베팅이 준비되고 있습니다.'
+       :v>=45?'대차가 늘고 있습니다. 재료 없는 상승은 조심하세요.':'대차 부담이 낮습니다.'},
+ {key:'flow',name:'거래소 순입금',tag:'EXCHANGE FLOW',only:'coin',unit:'',
+  desc:'거래소 유입 강도 (미제공 시 대형 체결 매도 편향으로 추정)',
+  state:v=>v>=70?['매도 준비','down']:v>=45?['유입 우세','warn']:['출금 우세','ok'],
+  read:v=>v>=70?'큰 물량이 매도 쪽으로 쏠려 체결되고 있습니다. 넘기는 손이 있습니다.'
+       :v>=45?'매도 체결이 매수보다 우세합니다. 압력이 서서히 붙습니다.'
+       :'대형 체결이 매수 쪽에 몰려 있습니다.'},
+];
+
+const PHASES=[
+  {t:'매집',d:'관심 없을 때 조용히 담는 구간'},
+  {t:'견인',d:'저항 돌파로 관심을 끌어오는 구간'},
+  {t:'분산',d:'거래량 터진 날 물량을 넘기는 구간'},
+  {t:'이탈',d:'지지 붕괴 후 방치되는 구간'},
+];
+
+const CV=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+
+function drawGauge(cv,val,big){
+  const ctx=cv.getContext('2d'),W=+cv.getAttribute('width'),H=+cv.getAttribute('height');
+  const dpr=window.devicePixelRatio||1;
+  if(cv.dataset.s!=='1'){cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+    ctx.scale(dpr,dpr);cv.dataset.s='1'}
+  ctx.clearRect(0,0,W,H);
+  const cx=W/2,cy=H-14,R=Math.min(W/2-12,H-26),lw=big?13:9;
+  const A0=Math.PI,A1=2*Math.PI,ang=v=>A0+(v/100)*(A1-A0);
+  ctx.lineWidth=lw;ctx.lineCap='butt';
+  ctx.strokeStyle=CV('--line');ctx.beginPath();ctx.arc(cx,cy,R,A0,A1);ctx.stroke();
+  ctx.strokeStyle='rgba(229,52,43,.34)';ctx.beginPath();ctx.arc(cx,cy,R,ang(70),A1);ctx.stroke();
+  ctx.strokeStyle='rgba(63,178,127,.22)';ctx.beginPath();ctx.arc(cx,cy,R,A0,ang(30));ctx.stroke();
+  ctx.strokeStyle=CV('--dim');ctx.lineWidth=1;
+  for(let i=0;i<=10;i++){const a=ang(i*10),r1=R-lw/2-3,r2=R-lw/2-(i%5===0?9:5);
+    ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);
+    ctx.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);ctx.stroke()}
+  if(val==null){
+    ctx.fillStyle=CV('--dim');ctx.font=`500 ${big?13:11}px ${CV('--mono').replace(/'/g,'')}`;
+    ctx.textAlign='center';ctx.fillText('NO DATA',cx,cy-R/2);return}
+  ctx.strokeStyle=val>=70?CV('--up'):val>=45?CV('--warn'):CV('--ok');
+  ctx.lineWidth=lw;ctx.beginPath();ctx.arc(cx,cy,R,A0,ang(val));ctx.stroke();
+  const a=ang(val),nr=R-lw-4;
+  ctx.strokeStyle=CV('--ivory');ctx.lineWidth=big?3:2;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(cx-Math.cos(a)*8,cy-Math.sin(a)*8);
+  ctx.lineTo(cx+Math.cos(a)*nr,cy+Math.sin(a)*nr);ctx.stroke();
+  ctx.fillStyle=CV('--ivory');ctx.beginPath();ctx.arc(cx,cy,big?5:3.5,0,7);ctx.fill();
+  ctx.fillStyle=CV('--ink');ctx.beginPath();ctx.arc(cx,cy,big?2:1.5,0,7);ctx.fill();
+  if(big){ctx.fillStyle=CV('--dim');ctx.font=`500 10px ${CV('--mono').replace(/'/g,'')}`;
+    ctx.textAlign='center';ctx.fillText('0',cx-R,cy+13);ctx.fillText('100',cx+R,cy+13)}
+}
+
+function drawSpark(cv,series){
+  const ctx=cv.getContext('2d'),W=cv.clientWidth||240,H=44,dpr=window.devicePixelRatio||1;
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.width='100%';cv.style.height=H+'px';ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  const max=Math.max(...series.map(Math.abs))||1,mid=H/2,bw=W/series.length;
+  ctx.strokeStyle=CV('--line');ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,mid);ctx.lineTo(W,mid);ctx.stroke();
+  series.forEach((v,i)=>{
+    const h=(Math.abs(v)/max)*(H/2-3);
+    ctx.fillStyle=v>=0?CV('--up'):CV('--down');
+    ctx.globalAlpha=i>=series.length-5?1:.55;
+    ctx.fillRect(i*bw+1,v>=0?mid-h:mid,bw-2,Math.max(1.5,h))});
+  ctx.globalAlpha=1;
+}
+
+function render(asset,data){
+  const ch=data.channels;
+  const score=composite(ch),v=verdict(score);
+
+  const el=id=>document.getElementById(id);
+  el('vscore').textContent=score??'—';
+  el('vscore').className='vscore '+v.tone;
+  el('vlabel').textContent=asset.name+' · '+v.label;
+  el('vlabel').className='vlabel '+v.tone;
+  el('vtext').textContent=v.text;
+  el('verdict').style.borderLeftColor=
+    CV(v.tone==='up'?'--up':v.tone==='down'?'--down':v.tone==='warn'?'--warn':'--dim');
+  drawGauge(el('vgauge'),score,true);
+
+  el('phases').innerHTML=PHASES.map((p,i)=>
+    `<div class="ph${i===v.phase?' on':''}"><div class="n">0${i+1} — PHASE</div>
+     <div class="t">${p.t}</div><div class="d">${p.d}</div></div>`).join('');
+
+  el('srcnote').innerHTML=data.live
+    ?`<span class="ok">● 실시간</span>`
+    :`<span class="warn">● 시뮬레이션 — 프록시 미연결</span>`;
+
+  const grid=el('grid');grid.innerHTML='';
+  const reasons=data.reasons||{};
+  CHANNELS.forEach(c=>{
+    const applies=c.only==='both'||c.only===asset.type;
+    const val=ch[c.key];
+    const ok=applies&&val!=null;
+    const [st,sc]=ok?c.state(val):['',''];
+    let tagCls=ok?(data.live?'live':'sim'):'';
+    let tagTxt=c.tag;
+    if(c.key==='flow'&&data.flowMethod==='whale-bias')tagTxt='WHALE BIAS';
+    const why=reasons[c.key];
+    const card=document.createElement('div');
+    card.className='card'+(ok?'':' na');
+    card.innerHTML=`
+      <div class="chead"><div class="cname">${c.name}</div>
+        <div class="ctag ${tagCls}">${tagTxt}</div></div>
+      <p class="cdesc">${c.desc}</p>
+      <div class="cbody"><canvas width="118" height="72"></canvas>
+        <div><div class="cnum ${ok?sc:'mut'}">${ok?val:'—'}<span class="cunit">${ok?c.unit:''}</span></div>
+        <div class="cstate ${ok?sc:'mut'}">${ok?st:(applies?'계산 보류':
+          asset.type==='stock'?'코인 전용 지표':'주식 전용 지표')}</div></div></div>
+      <p class="cread">${ok?c.read(val):(applies?
+        (why||'해당 소스가 연결되지 않았습니다.'):'이 자산군에는 해당하지 않습니다.')}</p>`;
+    grid.appendChild(card);
+    const cvs=card.querySelector('canvas');
+    drawGauge(cvs,ok?val:null,false);
+    if(!ok)cvs.style.opacity=.35;
+  });
+
+  const rows=data.series||[];
+  el('flownote').textContent=asset.type==='coin'?'최근 20일 · 코인 대체지표':'최근 20거래일';
+  const flow=el('flow');
+  if(!rows.length){flow.innerHTML='<p class="mut" style="margin:0;font-size:12.5px">수급 데이터가 연결되지 않았습니다.</p>';}
+  else{
+    flow.innerHTML=rows.map(([n])=>`<div class="frow"><div class="fname">${n}</div>
+      <div class="fspark"><canvas></canvas></div><div class="fval"></div><div class="fstreak"></div></div>`).join('');
+    [...flow.querySelectorAll('.frow')].forEach((row,i)=>{
+      const s=rows[i][1]||[];if(!s.length)return;
+      const sum=s.slice(-5).reduce((a,b)=>a+b,0);
+      let streak=0;const sg=Math.sign(s.at(-1));
+      for(let k=s.length-1;k>=0;k--){if(Math.sign(s[k])===sg&&sg!==0)streak++;else break}
+      drawSpark(row.querySelector('canvas'),s);
+      const fv=row.querySelector('.fval');
+      fv.textContent=(sum>=0?'+':'')+sum.toLocaleString();
+      fv.className='fval '+(sum>=0?'up':'down');
+      row.querySelector('.fstreak').textContent=streak+'일 연속';
+    });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   4. 구동
+   ═══════════════════════════════════════════════════════════ */
+let current=ASSETS[0],lastData=null;
+let generation=0,controller=null;
+
+function setStatus(mode,msg){
+  const d=document.getElementById('dot');
+  d.className='dot'+(mode==='live'?' live':mode==='err'?' err':'');
+  document.getElementById('stamp').textContent=msg;
+}
+
+async function load(asset){
+  const my=++generation;
+  controller?.abort();                      // 이전 수집을 즉시 중단
+  controller=new AbortController();
+  const signal=controller.signal;
+  const alive=()=>my===generation;
+
+  const need=asset.type==='coin'?COIN_SNAPS:STOCK_SNAPS;
+  const gap=asset.type==='coin'?COIN_GAP:STOCK_GAP;
+  const secs=Math.round(need*gap/1000);
+  setStatus('',`${asset.name} 수집 중 — 호가 0/${need} (약 ${secs}초)`);
+  const onProgress=(n,t)=>{if(alive())setStatus('',`${asset.name} 수집 중 — 호가 ${n}/${t}`)};
+
+  let data=null,failMsg=null;
+  try{
+    data=asset.type==='coin'
+      ? await loadCoin(asset.id,signal,onProgress)
+      : await loadStock(asset.id,signal,onProgress);
+  }catch(e){
+    if(e instanceof Cancelled||e.name==='Cancelled')return;   // 종목이 바뀐 것이므로 조용히 종료
+    failMsg=e.message;
+  }
+  if(!alive())return;
+
+  if(!data){
+    data=loadSim(asset);
+    setStatus(failMsg?'err':'',
+      failMsg?`불러오기 실패: ${failMsg} — 시뮬레이션 값을 표시합니다`
+             :'프록시가 설정되지 않아 시뮬레이션 값을 표시합니다');
+  }else{
+    setStatus('live',new Date().toLocaleString('ko-KR',{dateStyle:'medium',timeStyle:'short'})+' 기준 실시간');
+  }
+  lastData=data;render(asset,data);
+}
+
+const picker=document.getElementById('picker');
+ASSETS.forEach(a=>{
+  const b=document.createElement('button');
+  b.textContent=(a.type==='stock'?'▪ ':'◆ ')+a.name;
+  b.setAttribute('aria-pressed',a.id===current.id);
+  b.onclick=()=>{if(a.id===current.id)return;current=a;
+    [...picker.children].forEach(c=>c.setAttribute('aria-pressed','false'));
+    b.setAttribute('aria-pressed','true');load(a)};
+  picker.appendChild(b);
+});
+
+const proxyInput=document.getElementById('proxy');
+proxyInput.value=getProxy();
+document.getElementById('save').onclick=()=>{
+  try{localStorage.setItem(PROXY_KEY,proxyInput.value.trim())}catch{}
+  document.getElementById('cfgmsg').textContent='저장했습니다';
+  load(current)};
+document.getElementById('clear').onclick=()=>{
+  try{localStorage.removeItem(PROXY_KEY)}catch{}
+  proxyInput.value='';
+  document.getElementById('cfgmsg').textContent='지웠습니다';
+  load(current)};
+
+addEventListener('resize',()=>{if(lastData)render(current,lastData)});
+load(current);
+</script>
+</body>
+</html>
