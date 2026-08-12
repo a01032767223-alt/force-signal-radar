@@ -57,40 +57,95 @@ const num = v => {
   return Number.isFinite(n) ? n : 0;
 };
 
+/* ── KRX 세션 쿠키 ──────────────────────────────────
+   KRX는 쿠키 없는 요청을 "LOGOUT"으로 취급해 400을 던집니다.
+   JSESSIONID를 먼저 발급받아 모든 요청에 붙여야 합니다.
+   Worker 인스턴스가 살아있는 동안은 재사용하고, 만료되면 다시 받습니다. */
+let krxCookie = { value: null, exp: 0, trace: [] };
+async function fetchCookieJar(startUrl) {
+  const jar = new Map();
+  let target = startUrl, trace = [];
+  for (let hop = 0; hop < 5; hop++) {
+    const res = await fetch(target, {
+      redirect: 'manual',
+      headers: { 'user-agent': UA, 'accept-language': 'ko-KR,ko;q=0.9',
+        cookie: [...jar.entries()].map(([k, v]) => `${k}=${v}`).join('; ') || undefined },
+    });
+    const raw = typeof res.headers.getSetCookie === 'function'
+      ? res.headers.getSetCookie() : [res.headers.get('set-cookie')].filter(Boolean);
+    for (const c of raw) {
+      const [pair] = c.split(';');
+      const eq = pair.indexOf('=');
+      if (eq > 0) jar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+    }
+    trace.push({ hop, url: target, status: res.status, setCookieCount: raw.length });
+    const loc = res.headers.get('location');
+    if (res.status >= 300 && res.status < 400 && loc) { target = new URL(loc, target).toString(); continue; }
+    break;
+  }
+  return { jar, trace };
+}
+
+async function ensureKrxCookie(forceNew) {
+  if (!forceNew && krxCookie.value && Date.now() < krxCookie.exp) return krxCookie.value;
+
+  // mdiLoader가 쿠키를 안 주면 루트 페이지로 한 번 더 시도한다.
+  const attempts = [KRX_REFER, 'https://data.krx.co.kr/'];
+  let lastTrace = [];
+  for (const start of attempts) {
+    const { jar, trace } = await fetchCookieJar(start);
+    lastTrace = lastTrace.concat(trace);
+    const jsid = jar.get('JSESSIONID');
+    if (jsid) {
+      krxCookie = { value: `JSESSIONID=${jsid}`, exp: Date.now() + 25 * 60 * 1000, trace: lastTrace };
+      return krxCookie.value;
+    }
+  }
+  const e = new Error('KRX 세션 쿠키를 발급받지 못했습니다');
+  e.detail = { trace: lastTrace };
+  krxCookie.trace = lastTrace;
+  throw e;
+}
+
 /* ── KRX 호출부 — 여기가 400의 핵심 ─────────────── */
-export function buildKrxRequest(bld, params) {
+export function buildKrxRequest(bld, params, cookie) {
   const form = new URLSearchParams();
   form.set('bld', bld);                       // (7) 필수
   form.set('locale', 'ko_KR');
   for (const [k, v] of Object.entries(params)) {
-    if (v === undefined || v === null || v === '') continue;
+    if (v === undefined || v === null) continue;   // 빈 문자열은 전송한다 — KRX가 필드 존재 자체를 요구하는 경우가 있다
     // (4) 날짜형 파라미터는 무조건 숫자 8자리로 정규화
-    form.set(k, /Dd$/.test(k) ? ymd(v) : String(v));
+    form.set(k, /Dd$/.test(k) && v !== '' ? ymd(v) : String(v));
   }
+  const headers = {
+    // (3) JSON 금지. 반드시 폼 인코딩
+    'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    'origin': 'https://data.krx.co.kr',    // (8-b) 없으면 CSRF성 검사에서 걸릴 수 있다
+    'referer': KRX_REFER,                  // (2)
+    'user-agent': UA,                      // (6)
+    'accept': 'application/json, text/javascript, */*; q=0.01',
+    'x-requested-with': 'XMLHttpRequest',
+    'accept-language': 'ko-KR,ko;q=0.9',
+  };
+  if (cookie) headers.cookie = cookie;      // (8) 세션 쿠키 — 없으면 LOGOUT 400
   return {
     url: KRX_JSON,
-    init: {
-      method: 'POST',                          // (1)
-      headers: {
-        // (3) JSON 금지. 반드시 폼 인코딩
-        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'referer': KRX_REFER,                  // (2)
-        'user-agent': UA,                      // (6)
-        'accept': 'application/json, text/javascript, */*; q=0.01',
-        'x-requested-with': 'XMLHttpRequest',
-        'accept-language': 'ko-KR,ko;q=0.9',
-      },
-      body: form.toString(),
-    },
+    init: { method: 'POST', headers, body: form.toString() },   // (1)
     formPreview: form.toString(),
   };
 }
 
-async function krx(bld, params) {
-  const { url, init, formPreview } = buildKrxRequest(bld, params);
+async function krx(bld, params, retry = true) {
+  const cookie = await ensureKrxCookie(false);
+  const { url, init, formPreview } = buildKrxRequest(bld, params, cookie);
   const res = await fetch(url, init);
   const text = await res.text();
 
+  // 쿠키가 만료됐으면 KRX가 LOGOUT 본문과 함께 400을 준다 — 새 쿠키로 한 번만 재시도
+  if (!res.ok && retry && /LOGOUT/i.test(text)) {
+    await ensureKrxCookie(true);
+    return krx(bld, params, false);
+  }
   if (!res.ok) {
     const e = new Error(`KRX HTTP ${res.status}`);
     e.detail = { bld, sent: formPreview, status: res.status, body: text.slice(0, 400) };
@@ -135,29 +190,56 @@ async function resolveIsu(code) {
 
 /* ── 라우트 ──────────────────────────────────────── */
 
-/** 일별 시세 → [{date,open,high,low,close,volume}] 오래된순 */
+/** 일별 시세 → [{date,open,high,low,close,volume}] 오래된순
+ *  KRX 대신 Yahoo Finance를 쓴다. 한국 개별종목은 티커 뒤에 .KS(코스피) 또는
+ *  .KQ(코스닥)를 붙여야 하므로, 어느 쪽인지 모를 때는 코스피로 먼저 시도하고
+ *  실패하면 코스닥으로 재시도한다. KRX의 봇 차단·세션 요구를 완전히 피해 간다. */
+export async function fetchYahooOhlcv(ticker, count) {
+  const range = count <= 130 ? '6mo' : count <= 260 ? '1y' : '5y';
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}` +
+    `?interval=1d&range=${range}`;
+  const res = await fetch(url, { headers: { 'user-agent': UA } });
+  if (!res.ok) { const e = new Error(`Yahoo HTTP ${res.status}`); e.detail = { ticker }; throw e; }
+  const data = await res.json();
+  const r = data?.chart?.result?.[0];
+  if (!r) {
+    const e = new Error('야후 파이낸스에서 해당 티커를 찾지 못했습니다');
+    e.detail = { ticker, body: data?.chart?.error ?? null };
+    throw e;
+  }
+  const ts = r.timestamp || [];
+  const q = r.indicators?.quote?.[0] || {};
+  const rows = ts.map((t, i) => ({
+    date: new Date(t * 1000).toISOString().slice(0, 10).replace(/-/g, ''),
+    open: q.open?.[i], high: q.high?.[i], low: q.low?.[i],
+    close: q.close?.[i], volume: q.volume?.[i],
+  })).filter(c => c.date && Number.isFinite(c.close));
+  return rows.slice(-count);
+}
+
 async function routeOhlcv(code, count) {
-  const isu = await resolveIsu(code);
-  const { rows } = await krx(BLD.ohlcv, {
-    isuCd: isu, strtDd: daysAgo(Math.ceil(count * 1.7) + 10), endDd: daysAgo(0),
-    adjStkPrc: '2',                       // 수정주가 반영
-  });
-  return rows.map(r => ({
-    date: String(r.TRD_DD || '').replace(/\D/g, ''),
-    open: num(r.TDD_OPNPRC), high: num(r.TDD_HGPRC),
-    low: num(r.TDD_LWPRC), close: num(r.TDD_CLSPRC),
-    volume: num(r.ACC_TRDVOL),
-  })).filter(c => c.date && c.close > 0)
-     .sort((a, b) => a.date.localeCompare(b.date))
-     .slice(-count);
+  const short = code.replace(/\D/g, '').padStart(6, '0');
+  try {
+    return await fetchYahooOhlcv(`${short}.KS`, count);   // 코스피 먼저
+  } catch (e1) {
+    try {
+      return await fetchYahooOhlcv(`${short}.KQ`, count); // 코스닥 재시도
+    } catch (e2) {
+      const err = new Error('야후 파이낸스에서 시세를 가져오지 못했습니다 (KS/KQ 모두 실패)');
+      err.detail = { ksError: e1.message, kqError: e2.message };
+      throw err;
+    }
+  }
 }
 
 /** 투자자별 순매수 → {foreign:[],inst:[],retail:[]} 오래된순 */
 async function routeInvestor(code, days) {
   const isu = await resolveIsu(code);
   const { rows } = await krx(BLD.investor, {
-    isuCd: isu, strtDd: daysAgo(Math.ceil(days * 1.8) + 7), endDd: daysAgo(0),
+    isuCd: isu, isuCd2: '',
+    strtDd: daysAgo(Math.ceil(days * 1.8) + 7), endDd: daysAgo(0),
     inqTpCd: '2', trdVolVal: '2', askBid: '3',   // 일별 / 거래대금 / 순매수
+    csvxls_isNo: 'false',
   });
   const asc = rows
     .map(r => ({ d: String(r.TRD_DD || '').replace(/\D/g, ''), r }))
@@ -178,8 +260,9 @@ async function routeInvestor(code, days) {
 async function routeShort(code, days) {
   const isu = await resolveIsu(code);
   const { rows } = await krx(BLD.short, {
-    isuCd: isu, strtDd: daysAgo(Math.ceil(days * 1.8) + 10), endDd: daysAgo(0),
-    mktTpCd: '1',
+    isuCd: isu, isuCd2: '',
+    strtDd: daysAgo(Math.ceil(days * 1.8) + 10), endDd: daysAgo(0),
+    mktTpCd: '1', csvxls_isNo: 'false',
   });
   return rows
     .map(r => ({ d: String(r.TRD_DD || '').replace(/\D/g, ''),
@@ -269,7 +352,8 @@ export default {
       switch (p) {
         case '/':
         case '/health':
-          return json({ ok: true, routes: ['/ohlcv', '/investor', '/short', '/orderbook', '/trades', '/diag'] });
+          return json({ ok: true, routes: ['/ohlcv', '/investor', '/orderbook', '/trades', '/diag'],
+                        disabled: ['/short (KRX 세션 문제로 비활성화)'] });
 
         /* 400의 정체를 한 번에 보여주는 진단 창구 */
         case '/diag': {
@@ -277,20 +361,36 @@ export default {
           const extra = {};
           for (const [k, v] of url.searchParams) if (!['bld'].includes(k)) extra[k] = v;
           if (!Object.keys(extra).length) Object.assign(extra, { mktsel: 'ALL', typeNo: '0', searchText: code });
-          const { formPreview } = buildKrxRequest(bld, extra);
+          let cookieState = 'unknown', trace = [];
+          try {
+            const c = await ensureKrxCookie(false);
+            cookieState = c ? '발급됨 (' + c.slice(0, 24) + '…)' : '없음';
+            trace = krxCookie.trace;
+          } catch (e) { cookieState = '발급 실패: ' + e.message; trace = e.detail?.trace || []; }
+          const { formPreview } = buildKrxRequest(bld, extra, null);
           try {
             const { rows, raw } = await krx(bld, extra);
-            return json({ ok: true, bld, sent: formPreview, rowCount: rows.length,
-                          firstRow: rows[0] ?? null, keys: Object.keys(raw) });
+            return json({ ok: true, bld, cookie: cookieState, cookieTrace: trace, sent: formPreview,
+                          rowCount: rows.length, firstRow: rows[0] ?? null, keys: Object.keys(raw) });
           } catch (e) {
-            return json({ ok: false, bld, sent: formPreview,
+            return json({ ok: false, bld, cookie: cookieState, cookieTrace: trace, sent: formPreview,
                           message: e.message, detail: e.detail ?? null }, 200);
           }
         }
 
         case '/ohlcv':     out = await routeOhlcv(code, n('count') || 120); break;
         case '/investor':  out = await routeInvestor(code, n('days') || 20); break;
-        case '/short':     out = await routeShort(code, n('days') || 30); break;
+        /* 대차잔고는 KRX가 세션 요구사항이 불명확해 재현 가능한 성공 요청을
+           만들지 못했다. 계속 두드리면 실패하는 KRX 요청만 쌓이므로,
+           호출 자체를 막고 이유를 그대로 알려준다.
+           나중에 다시 시도하려면 이 case를 지우고 routeShort를 되살리면 된다. */
+        case '/short':
+          return fail(
+            'KRX 대차잔고 조회는 현재 비활성화되어 있습니다',
+            '세션/파라미터를 여러 방식으로 시도했으나 KRX가 계속 LOGOUT 오류를 반환합니다. ' +
+            '나머지 5채널(매집·분산·허수율·수급·유입)은 정상 작동합니다.',
+            501
+          );
         case '/orderbook':
           if (!env.KIS_APPKEY) return fail('KIS 키가 등록되지 않았습니다',
             'wrangler secret put KIS_APPKEY / KIS_APPSECRET', 501);
