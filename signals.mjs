@@ -195,3 +195,42 @@ export function verdict(score) {
   if (score >= 38) return { label: '분산 경계', tone: 'warn', phase: 2 };
   return { label: '이탈 국면', tone: 'down', phase: 3 };
 }
+
+/* ── 눌림목 판정 ──────────────────────────────────────
+   index.html의 detectPullback과 완전히 동일한 로직을 유지한다.
+   한쪽만 고치고 잊어버리면 테스트가 실제 배포본과 다른 걸 검증하게 되므로,
+   수정 시 반드시 양쪽을 함께 바꿀 것. */
+export function detectPullback(candles) {
+  if (!candles || candles.length < 25) return { state: 'insufficient' };
+  const win = candles.slice(-21);
+  const today = win.at(-1);
+  const peakIdx = win.reduce((bi, c, i) => (c.close > win[bi].close ? i : bi), 0);
+  const peak = win[peakIdx];
+  const daysElapsed = win.length - 1 - peakIdx;
+
+  if (daysElapsed === 0)
+    return { state: 'none', daysElapsed: 0, dropPct: 0, peakDate: peak.date, peakClose: peak.close };
+
+  const dropPct = Math.round(((peak.close - today.close) / peak.close) * 1000) / 10;
+  const ma20 = mean(candles.slice(-20).map(c => c.close));
+  const supportHeld = today.close >= ma20 * 0.97;
+
+  const since = win.slice(peakIdx + 1);
+  const avgVolBase = mean(candles.slice(-40, -20).map(c => c.volume)) || 1;
+  const avgVolSince = mean(since.map(c => c.volume));
+  const volumeContraction = avgVolSince < avgVolBase * 0.85;
+
+  const yesterday = win.at(-2);
+  const reboundToday = today.close > yesterday.close &&
+    today.volume > mean(since.slice(0, -1).map(c => c.volume) || [today.volume]) * 1.15;
+
+  let state;
+  if (!supportHeld || dropPct > 18 || daysElapsed > 15) state = 'breakdown';
+  else if (dropPct < 2) state = 'watching';
+  else if (reboundToday) state = 'ending';
+  else state = 'active';
+
+  return { state, daysElapsed, dropPct, volumeContraction, supportHeld,
+    peakDate: peak.date, peakClose: peak.close, todayClose: today.close, ma20: Math.round(ma20) };
+}
+

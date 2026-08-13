@@ -23,7 +23,7 @@
 :root{
   --ink:#12161C;--panel:#191F27;--panel2:#141A21;--line:#2B333F;
   --ivory:#EDE7DC;--muted:#8A94A3;--dim:#5C6674;
-  --up:#E5342B;--down:#1E63D0;--warn:#F2A33C;--ok:#3FB27F;
+  --up:#E5342B;--down:#1E63D0;--warn:#F2A33C;--ok:#3FB27F;--watch:#2DD4BF;
   --mono:'IBM Plex Mono',ui-monospace,monospace;--sans:'Pretendard',system-ui,sans-serif;
 }
 *{box-sizing:border-box}
@@ -58,11 +58,14 @@ h1 em{font-style:normal;color:var(--up)}
 .pgroup{display:flex;gap:12px;align-items:flex-start;padding:7px 0}
 .pglabel{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.06em;
   flex:0 0 74px;padding-top:7px;text-align:right}
-.pgitems{display:flex;gap:7px;flex-wrap:wrap;flex:1;min-width:0}
+.pgitems{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;flex:1;min-width:0}
+.pgitems button{width:100%;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(min-width:561px) and (max-width:860px){.pgitems{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){
   .pgroup{flex-direction:column;gap:5px}
   .pglabel{text-align:left;padding-top:0;flex:none}
   .mtab{padding:8px 11px;font-size:12px}
+  .pgitems{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 .picker button{font-family:var(--mono);font-size:12px;letter-spacing:.04em;background:var(--panel2);
   color:var(--muted);border:1px solid var(--line);padding:9px 14px;border-radius:2px;cursor:pointer;transition:.15s}
@@ -87,6 +90,34 @@ h1 em{font-style:normal;color:var(--up)}
 .flowadvice p{margin:0;font-size:13px;line-height:1.72;color:var(--ivory)}
 .flowadvice b{color:var(--warn);font-weight:600}
 button[aria-pressed="true"] .psec{color:var(--ink);opacity:.55}
+.pullback{margin-top:12px;border:1px solid var(--line);border-radius:10px;
+  background:var(--panel);padding:15px 18px;transition:.25s}
+.pullback.pb-watch{border-color:rgba(45,212,191,.4)}
+.pullback.pb-up{border-color:rgba(229,52,43,.4)}
+.pullback.pb-down{border-color:rgba(30,99,208,.5);background:rgba(30,99,208,.06)}
+.pullback.pb-strong{border-width:2px;border-color:var(--watch);
+  background:linear-gradient(180deg,rgba(45,212,191,.09),rgba(45,212,191,.02));
+  box-shadow:0 0 0 1px var(--watch) inset,0 6px 24px -8px rgba(45,212,191,.5)}
+.pbhead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.pbbadge{font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:.03em;
+  padding:4px 11px;border-radius:6px;background:var(--watch);color:#06231F}
+.pb-up .pbbadge{background:var(--up);color:#2A0503}
+.pb-down .pbbadge{background:var(--down);color:#04122E}
+.pbdays{font-family:var(--mono);font-size:12px;color:var(--watch);font-weight:700}
+.pb-down .pbdays{color:var(--down)}
+.pbline{margin:0 0 10px;font-size:15px;font-weight:700;color:var(--ivory)}
+.pbdots{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:11px}
+.pbdot{width:15px;height:8px;border-radius:2px;background:var(--panel2);
+  border:1px solid var(--line)}
+.pbdot.on{background:var(--watch);border-color:var(--watch)}
+.pb-down .pbdot.on{background:var(--down);border-color:var(--down)}
+.pblabel{font-size:11px;color:var(--dim);margin-left:6px}
+.pbbody{margin:0;font-size:13px;line-height:1.75;color:var(--muted)}
+.pbbody b{color:var(--ivory)}
+.pbmeta{margin:10px 0 0;padding-top:9px;border-top:1px dashed var(--line);
+  font-size:11px;color:var(--dim);font-family:var(--mono)}
+@media(max-width:520px){.pbhead{flex-wrap:wrap}}
+
 .synth{margin-top:16px;border:1px solid var(--line);border-left:3px solid var(--dim);
   border-radius:10px;background:var(--panel);padding:16px 18px}
 .synth.up{border-left-color:var(--up)}.synth.down{border-left-color:var(--down)}
@@ -120,14 +151,21 @@ button[aria-pressed="true"] .psec{color:var(--ink);opacity:.55}
 .pending .prow span{color:var(--muted)}
 @media(max-width:520px){.pending .prow{flex-direction:column;gap:2px}}
 
-.phases{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
-  border:1px solid var(--line);margin:0 0 26px}
-.ph{background:var(--panel2);padding:14px 12px 16px;position:relative;opacity:.42;transition:.3s}
-.ph.on{opacity:1;background:var(--panel)}
-.ph.on::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;background:var(--up)}
-.ph .n{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.16em}
+.phases{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 26px}
+.ph{background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+  padding:14px 12px 16px;position:relative;opacity:.48;transition:.25s}
+.ph.on{opacity:1;background:var(--panel);border-width:2px;padding:13px 11px 15px}
+.ph.on.t-up{border-color:var(--up);box-shadow:0 0 0 1px var(--up) inset,0 4px 18px -6px rgba(229,52,43,.45)}
+.ph.on.t-warn{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset,0 4px 18px -6px rgba(242,163,60,.45)}
+.ph.on.t-down{border-color:var(--down);box-shadow:0 0 0 1px var(--down) inset,0 4px 18px -6px rgba(30,99,208,.45)}
+.ph .n{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.16em;
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
 .ph .t{font-size:14px;font-weight:700;margin:5px 0 4px}
-.ph.on .t{color:var(--up)}
+.ph.on.t-up .t{color:var(--up)}
+.ph.on.t-warn .t{color:var(--warn)}
+.ph.on.t-down .t{color:var(--down)}
+.ph.on .n::after{content:'현재';flex:0 0 auto;white-space:nowrap;font-size:9px;letter-spacing:.04em;
+  color:inherit;opacity:.85;border:1px solid currentColor;border-radius:9px;padding:1px 7px}
 .ph .d{font-size:11.5px;color:var(--muted);line-height:1.5}
 
 h2{font-size:12px;font-family:var(--mono);letter-spacing:.2em;color:var(--dim);text-transform:uppercase;
@@ -222,6 +260,7 @@ footer code{font-family:var(--mono);color:var(--muted);font-size:11px}
 <h2>6채널 신호 계기판 <span id="srcnote"></span></h2>
 <div class="grid" id="grid"></div>
 <div class="synth" id="synth" style="display:none"></div>
+<div class="pullback" id="pullback" style="display:none"></div>
 <details class="pending" id="pending" style="display:none"></details>
 
 <h2>수급 발자국 <span id="flownote">최근 20거래일</span></h2>
@@ -320,6 +359,49 @@ function distribution(c){
   const bear=heavy.filter(x=>x.close<x.open).length/heavy.length;
   const pos=1-mean(heavy.map(x=>{const r=x.high-x.low;return r?(x.close-x.low)/r:.5}));
   return Math.round(clamp(wick*100*.42+bear*100*.28+pos*100*.30))}
+
+/* ── 눌림목 판정 ──────────────────────────────────────
+   매집·관심이 확인됐다고 바로 사면 고점에 물릴 수 있다.
+   "지금이 쉬어가는 정상적인 조정인지, 아니면 지지가 깨진 위험 신호인지"를
+   판별해 초보자가 진입 타이밍을 잡을 수 있게 돕는다.
+   반환값은 렌더링 전용이 아니라 항상 계산 가능한 순수 데이터라 테스트하기 쉽다. */
+function detectPullback(candles){
+  if(!candles||candles.length<25)return{state:'insufficient'};
+  const win=candles.slice(-21);           // 최근 20거래일 + 오늘
+  const today=win.at(-1);
+  const peakIdx=win.reduce((bi,c,i)=>c.close>win[bi].close?i:bi,0);
+  const peak=win[peakIdx];
+  const daysElapsed=win.length-1-peakIdx;
+
+  if(daysElapsed===0)
+    return{state:'none',daysElapsed:0,dropPct:0,peakDate:peak.date,peakClose:peak.close};
+
+  const dropPct=Math.round(((peak.close-today.close)/peak.close)*1000)/10;
+  const ma20=mean(candles.slice(-20).map(c=>c.close));
+  const supportHeld=today.close>=ma20*0.97;
+
+  const since=win.slice(peakIdx+1);       // 고점 다음날부터 오늘까지
+  const avgVolBase=mean(candles.slice(-40,-20).map(c=>c.volume))||1;
+  const avgVolSince=mean(since.map(c=>c.volume));
+  const volumeContraction=avgVolSince<avgVolBase*0.85;
+
+  const yesterday=win.at(-2);
+  const reboundToday=today.close>yesterday.close&&
+    today.volume>mean(since.slice(0,-1).map(c=>c.volume)||[today.volume])*1.15;
+
+  let state;
+  if(!supportHeld||dropPct>18||daysElapsed>15)
+    state='breakdown';               // 눌림이 아니라 지지가 무너진 것으로 판단
+  else if(dropPct<2)
+    state='watching';                // 고점 근처, 아직 눌림이라 부르기 이름
+  else if(reboundToday)
+    state='ending';                  // 거래량 실리며 반등 — 마무리 신호
+  else
+    state='active';                  // 조정 진행 중, 지지 유지
+
+  return{state,daysElapsed,dropPct,volumeContraction,supportHeld,
+    peakDate:peak.date,peakClose:peak.close,todayClose:today.close,ma20:Math.round(ma20)};
+}
 
 const DEPTH=5;   // 판정 대상 호가 깊이 — 먼 호가의 자연 변동은 제외
 function spoofRate(snaps,trades){
@@ -648,60 +730,77 @@ function loadSim(asset){
 const MARKETS=[['crypto','암호화폐'],['kospi','코스피'],['kosdaq','코스닥']];
 
 /* 종목 코드는 사람이 적어 넣은 값이라 오타가 있을 수 있다.
-   잘못된 코드는 시세 조회에서 그대로 오류로 드러나므로, 그때 해당 줄만 고치면 된다. */
+   잘못된 코드는 시세 조회에서 그대로 오류로 드러나므로, 그때 해당 줄만 고치면 된다.
+   (특히 신규 추가한 암호화폐 5종은 업비트 KRW 마켓 상장 여부를 100% 확신하지 못한다.) */
 const ASSETS=[
-  /* ── 암호화폐 ─────────────────────────── */
-  {id:'KRW-BTC', name:'비트코인',   type:'coin', market:'crypto', sector:'대장주',   seed:47,tilt:.55},
-  {id:'KRW-ETH', name:'이더리움',   type:'coin', market:'crypto', sector:'대장주',   seed:59,tilt:.46},
-  {id:'KRW-XRP', name:'리플',       type:'coin', market:'crypto', sector:'결제',     seed:73,tilt:.24},
-  {id:'KRW-SOL', name:'솔라나',     type:'coin', market:'crypto', sector:'플랫폼',   seed:31,tilt:.50},
-  {id:'KRW-DOGE',name:'도지코인',   type:'coin', market:'crypto', sector:'밈',       seed:88,tilt:.18},
+  /* ── 암호화폐 · 섹터당 1종목 ────────────── */
+  {id:'KRW-BTC', name:'비트코인',    type:'coin',market:'crypto',sector:'대장주',      seed:47,tilt:.55},
+  {id:'KRW-ETH', name:'이더리움',    type:'coin',market:'crypto',sector:'스마트컨트랙트',seed:59,tilt:.46},
+  {id:'KRW-XRP', name:'리플',        type:'coin',market:'crypto',sector:'결제',        seed:73,tilt:.24},
+  {id:'KRW-SOL', name:'솔라나',      type:'coin',market:'crypto',sector:'고성능 L1',   seed:31,tilt:.50},
+  {id:'KRW-DOGE',name:'도지코인',    type:'coin',market:'crypto',sector:'밈',          seed:88,tilt:.18},
+  {id:'KRW-AAVE',name:'에이브',      type:'coin',market:'crypto',sector:'디파이',       seed:52,tilt:.33},
+  {id:'KRW-LINK',name:'체인링크',    type:'coin',market:'crypto',sector:'오라클',       seed:64,tilt:.37},
+  {id:'KRW-ADA', name:'에이다',      type:'coin',market:'crypto',sector:'PoS 원조',    seed:26,tilt:.21},
+  {id:'KRW-SAND',name:'샌드박스',    type:'coin',market:'crypto',sector:'메타버스',     seed:38,tilt:.19},
+  {id:'KRW-RNDR',name:'렌더토큰',    type:'coin',market:'crypto',sector:'AI·컴퓨팅',    seed:44,tilt:.29},
 
-  /* ── 코스피 · 섹터당 3종목 ─────────────── */
+  /* ── 코스피 · 섹터당 4종목 ─────────────── */
   {id:'005930',name:'삼성전자',            type:'stock',market:'kospi',sector:'반도체',   seed:11,tilt:.62},
   {id:'000660',name:'SK하이닉스',          type:'stock',market:'kospi',sector:'반도체',   seed:29,tilt:.38},
   {id:'042700',name:'한미반도체',          type:'stock',market:'kospi',sector:'반도체',   seed:83,tilt:.44},
+  {id:'000990',name:'DB하이텍',            type:'stock',market:'kospi',sector:'반도체',   seed:56,tilt:.34},
 
   {id:'373220',name:'LG에너지솔루션',      type:'stock',market:'kospi',sector:'2차전지',  seed:37,tilt:.33},
   {id:'006400',name:'삼성SDI',             type:'stock',market:'kospi',sector:'2차전지',  seed:61,tilt:.29},
   {id:'005490',name:'POSCO홀딩스',         type:'stock',market:'kospi',sector:'2차전지',  seed:17,tilt:.41},
+  {id:'096770',name:'SK이노베이션',        type:'stock',market:'kospi',sector:'2차전지',  seed:22,tilt:.36},
 
   {id:'005380',name:'현대차',              type:'stock',market:'kospi',sector:'자동차',   seed:23,tilt:.48},
   {id:'000270',name:'기아',                type:'stock',market:'kospi',sector:'자동차',   seed:71,tilt:.51},
   {id:'012330',name:'현대모비스',          type:'stock',market:'kospi',sector:'자동차',   seed:43,tilt:.39},
+  {id:'161390',name:'한국타이어앤테크놀로지',type:'stock',market:'kospi',sector:'자동차', seed:65,tilt:.28},
 
   {id:'207940',name:'삼성바이오로직스',    type:'stock',market:'kospi',sector:'바이오',   seed:67,tilt:.52},
   {id:'068270',name:'셀트리온',            type:'stock',market:'kospi',sector:'바이오',   seed:13,tilt:.36},
   {id:'000100',name:'유한양행',            type:'stock',market:'kospi',sector:'바이오',   seed:97,tilt:.47},
+  {id:'302440',name:'SK바이오사이언스',    type:'stock',market:'kospi',sector:'바이오',   seed:48,tilt:.31},
 
   {id:'035420',name:'NAVER',               type:'stock',market:'kospi',sector:'인터넷',   seed:53,tilt:.35},
   {id:'035720',name:'카카오',              type:'stock',market:'kospi',sector:'인터넷',   seed:79,tilt:.27},
   {id:'259960',name:'크래프톤',            type:'stock',market:'kospi',sector:'인터넷',   seed:31,tilt:.43},
+  {id:'377300',name:'카카오페이',          type:'stock',market:'kospi',sector:'인터넷',   seed:35,tilt:.25},
 
   {id:'012450',name:'한화에어로스페이스',  type:'stock',market:'kospi',sector:'방산·조선',seed:19,tilt:.58},
   {id:'329180',name:'HD현대중공업',        type:'stock',market:'kospi',sector:'방산·조선',seed:89,tilt:.56},
   {id:'047810',name:'한국항공우주',        type:'stock',market:'kospi',sector:'방산·조선',seed:41,tilt:.49},
+  {id:'064350',name:'현대로템',            type:'stock',market:'kospi',sector:'방산·조선',seed:45,tilt:.53},
 
   {id:'105560',name:'KB금융',              type:'stock',market:'kospi',sector:'금융',     seed:77,tilt:.44},
   {id:'055550',name:'신한지주',            type:'stock',market:'kospi',sector:'금융',     seed:59,tilt:.42},
   {id:'000810',name:'삼성화재',            type:'stock',market:'kospi',sector:'금융',     seed:7, tilt:.40},
+  {id:'086790',name:'하나금융지주',        type:'stock',market:'kospi',sector:'금융',     seed:9, tilt:.38},
 
-  /* ── 코스닥 · 섹터당 3종목 ─────────────── */
+  /* ── 코스닥 · 섹터당 4종목 ─────────────── */
   {id:'247540',name:'에코프로비엠',        type:'stock',market:'kosdaq',sector:'2차전지', seed:41,tilt:.30},
   {id:'086520',name:'에코프로',            type:'stock',market:'kosdaq',sector:'2차전지', seed:63,tilt:.28},
   {id:'066970',name:'엘앤에프',            type:'stock',market:'kosdaq',sector:'2차전지', seed:91,tilt:.26},
+  {id:'005070',name:'코스모신소재',        type:'stock',market:'kosdaq',sector:'2차전지', seed:14,tilt:.24},
 
   {id:'196170',name:'알테오젠',            type:'stock',market:'kosdaq',sector:'바이오',  seed:27,tilt:.54},
   {id:'141080',name:'리가켐바이오',        type:'stock',market:'kosdaq',sector:'바이오',  seed:49,tilt:.50},
   {id:'145020',name:'휴젤',                type:'stock',market:'kosdaq',sector:'바이오',  seed:73,tilt:.45},
+  {id:'068760',name:'셀트리온제약',        type:'stock',market:'kosdaq',sector:'바이오',  seed:75,tilt:.42},
 
   {id:'058470',name:'리노공업',            type:'stock',market:'kosdaq',sector:'반도체',  seed:33,tilt:.53},
   {id:'039030',name:'이오테크닉스',        type:'stock',market:'kosdaq',sector:'반도체',  seed:57,tilt:.46},
   {id:'240810',name:'원익IPS',             type:'stock',market:'kosdaq',sector:'반도체',  seed:81,tilt:.37},
+  {id:'319660',name:'피에스케이',          type:'stock',market:'kosdaq',sector:'반도체',  seed:85,tilt:.35},
 
   {id:'263750',name:'펄어비스',            type:'stock',market:'kosdaq',sector:'게임·엔터',seed:15,tilt:.31},
   {id:'041510',name:'에스엠',              type:'stock',market:'kosdaq',sector:'게임·엔터',seed:69,tilt:.34},
   {id:'035900',name:'JYP Ent.',            type:'stock',market:'kosdaq',sector:'게임·엔터',seed:93,tilt:.32},
+  {id:'112040',name:'위메이드',            type:'stock',market:'kosdaq',sector:'게임·엔터',seed:95,tilt:.20},
 ];
 
 const CHANNELS=[
@@ -860,8 +959,9 @@ function render(asset,data){
     v.tone==='down'?CV('--down'):null;
   drawGauge(el('vgauge'),score,true,toneColor);
 
+  const phaseTone=['up','up','warn','down'];   // 매집·견인=상승계열, 분산=주의, 이탈=하락계열
   el('phases').innerHTML=PHASES.map((p,i)=>
-    `<div class="ph${i===v.phase?' on':''}"><div class="n">0${i+1} — PHASE</div>
+    `<div class="ph${i===v.phase?' on t-'+phaseTone[i]:''}"><div class="n">0${i+1} — PHASE</div>
      <div class="t">${p.t}</div><div class="d">${p.d}</div></div>`).join('');
 
   el('srcnote').innerHTML=data.live
@@ -911,6 +1011,7 @@ function render(asset,data){
   }
 
   renderSynthesis(ch,asset,score,pending.length);
+  renderPullback(data.candles,score);
 
   const pend=el('pending');
   if(pending.length){
@@ -1044,6 +1145,66 @@ function renderSynthesis(ch,asset,score,missing){
     <p class="sydisc">이 판정은 과거 가격·거래량·호가에서 계산한 통계적 정황일 뿐, 투자 자문이 아닙니다.
       같은 신호가 정상적인 기관 매매에서도 나올 수 있고, 앞으로의 가격을 보장하지 않습니다.
       최종 판단과 책임은 본인에게 있습니다.</p>`;
+}
+
+/* ── 눌림목 표시 ──────────────────────────────────────
+   매집·관심을 확인했다고 바로 사면 고점에 물리기 쉽다.
+   "지금 쉬어가는 정상적인 조정인지, 지지가 깨진 위험 신호인지"를
+   경과일·하락률과 함께 강하게 보여준다. */
+const PB_COPY={
+  watching:{badge:'눌림 관찰',tone:'watch',
+    head:v=>`고점 대비 -${v.dropPct}% — 아직 눌림이라 부르기엔 이릅니다`,
+    body:'조정 초입입니다. 며칠 더 지켜보면서 거래량이 줄어드는지 확인하세요. '+
+         '지금 당장 진입할 필요는 없습니다.'},
+  active:{badge:'눌림목 진행 중',tone:'watch',
+    head:v=>`${v.daysElapsed}일째 조정 · 고점 대비 -${v.dropPct}%`,
+    body:v=>`거래량이 줄며 조용히 쉬는 중${v.volumeContraction?'입니다':'이지만 아직 뚜렷하진 않습니다'}. `+
+         `20일선(${v.ma20.toLocaleString()}) 위를 지키고 있어, 매집 국면에서 흔히 나오는 정상적인 `+
+         `쉬어가기로 보입니다. <b>지금이 추격매수보다 분할로 접근을 검토할 만한 자리</b>입니다. `+
+         '다만 지지가 깨지면 판단이 완전히 달라지니 계속 확인하세요.'},
+  ending:{badge:'눌림 마무리 신호',tone:'up',
+    head:v=>`${v.daysElapsed}일 만에 거래량 동반 반등`,
+    body:'조정이 끝나가는 국면일 수 있습니다. 다만 하루 반등만으로 단정하기는 이르니, '+
+         '다음 1~2일 더 거래량이 붙으며 오르는지 확인한 뒤 판단해도 늦지 않습니다.'},
+  breakdown:{badge:'지지 이탈 — 눌림 아님',tone:'down',
+    head:v=>`고점 대비 -${v.dropPct}% · 20일선 하회`,
+    body:'이건 정상적인 눌림이 아니라 <b>지지가 무너진 것</b>으로 보입니다. '+
+         '눌림목을 노리고 접근할 자리가 아니며, 신규 진입은 보류하는 편이 안전합니다.'},
+  none:{badge:'고점 경신 중',tone:'up',
+    head:()=>'지금이 최근 20일 중 고점입니다',
+    body:'이미 오른 자리를 추격하면 눌림목 전략의 장점이 사라집니다. '+
+         '지금 매수하기보다, 조정이 나올 때까지 기다리는 편을 권합니다.'},
+};
+
+function renderPullback(candles,score){
+  const box=document.getElementById('pullback');
+  const r=detectPullback(candles);
+  if(r.state==='insufficient'){box.style.display='none';return}
+
+  const c=PB_COPY[r.state];
+  const bodyText=typeof c.body==='function'?c.body(r):c.body;
+  const headText=c.head(r);
+
+  // 경과일 점 표시기 — 전형적인 눌림 구간(3~10거래일)을 기준으로 채운다
+  // 'none'(고점 당일)은 아직 경과가 없어 점을 보여줄 이유가 없다
+  const TYP=10;
+  const showDots=r.daysElapsed!=null&&r.state!=='none';
+  const dots=showDots?Array.from({length:TYP},(_,i)=>
+    `<span class="pbdot${i<r.daysElapsed?' on':''}"></span>`).join(''):'';
+
+  box.style.display='';
+  box.className='pullback pb-'+c.tone+(r.state==='active'?' pb-strong':'');
+  box.innerHTML=`
+    <div class="pbhead">
+      <span class="pbbadge">${c.badge}</span>
+      ${['active','ending','breakdown'].includes(r.state)?`<span class="pbdays">${r.daysElapsed}일째</span>`:''}
+    </div>
+    <p class="pbline">${headText}</p>
+    ${dots?`<div class="pbdots" title="경과 ${r.daysElapsed}거래일 · 통상 3~10거래일 구간을 기준으로 표시">
+      ${dots}<span class="pblabel">경과 ${r.daysElapsed}거래일 (통상 3~10거래일)</span></div>`:''}
+    <p class="pbbody">${bodyText}</p>
+    ${r.peakDate?`<p class="pbmeta">기준 고점 ${r.peakDate} · ${Math.round(r.peakClose).toLocaleString()}
+      ${r.ma20?` · 20일선 ${r.ma20.toLocaleString()}`:''}</p>`:''}`;
 }
 
 /* 줄별 한 줄 해석 — 숫자가 아니라 "무슨 일이 벌어지는 중인지"를 말한다 */
