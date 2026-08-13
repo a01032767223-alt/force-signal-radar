@@ -59,6 +59,25 @@ h1 em{font-style:normal;color:var(--up)}
 .vlabel{font-size:19px;font-weight:800;letter-spacing:-.02em;margin:10px 0 6px}
 .vtext{color:var(--muted);font-size:13px;line-height:1.7;margin:0}
 .vgauge{justify-self:center}
+.psec{font-size:10px;color:var(--dim);letter-spacing:.02em;margin-left:5px}
+.fread{flex:0 0 100%;font-size:12px;color:var(--muted);line-height:1.6;
+  padding:7px 0 1px;border-top:1px dashed var(--line);margin-top:4px}
+.flowadvice{margin-top:14px;border:1px solid var(--line);border-left:3px solid var(--warn);
+  border-radius:8px;background:var(--panel2);padding:13px 15px}
+.flowadvice .fatitle{font-family:var(--mono);font-size:11px;color:var(--warn);
+  letter-spacing:.06em;margin-bottom:6px}
+.flowadvice p{margin:0;font-size:13px;line-height:1.72;color:var(--ivory)}
+.flowadvice b{color:var(--warn);font-weight:600}
+button[aria-pressed="true"] .psec{color:var(--ink);opacity:.55}
+.pending{margin-top:14px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel2);padding:10px 13px}
+.pending summary{cursor:pointer;font-size:12px;color:var(--muted);
+  font-family:var(--mono);letter-spacing:.02em}
+.pending summary::marker{color:var(--dim)}
+.pending .prow{display:flex;gap:10px;padding:8px 0 0;font-size:12px;line-height:1.55}
+.pending .prow b{color:var(--ivory);font-weight:600;flex:0 0 auto;min-width:96px}
+.pending .prow span{color:var(--muted)}
+@media(max-width:520px){.pending .prow{flex-direction:column;gap:2px}}
 
 .phases{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
   border:1px solid var(--line);margin:0 0 26px}
@@ -93,7 +112,7 @@ h2 span{letter-spacing:0;text-transform:none;font-size:11px}
   border-top:1px dashed var(--line)}
 
 .flow{background:var(--panel);border:1px solid var(--line);padding:18px}
-.frow{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--line)}
+.frow{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--line)}
 .frow:last-child{border-bottom:0}
 .fname{font-size:13px;font-weight:600;width:100px;flex-shrink:0}
 .fspark{flex:1;min-width:0}
@@ -153,16 +172,18 @@ footer code{font-family:var(--mono);color:var(--muted);font-size:11px}
     <div class="vlabel" id="vlabel">불러오는 중</div>
     <p class="vtext" id="vtext">Upbit에서 일봉·호가·체결 데이터를 가져오고 있습니다.</p>
   </div>
-  <canvas class="vgauge" id="vgauge" width="260" height="150" aria-label="세력 종합 점수"></canvas>
+  <canvas class="vgauge" id="vgauge" width="300" height="86" aria-label="세력 종합 점수"></canvas>
 </div>
 
 <div class="phases" id="phases"></div>
 
 <h2>6채널 신호 계기판 <span id="srcnote"></span></h2>
 <div class="grid" id="grid"></div>
+<details class="pending" id="pending" style="display:none"></details>
 
 <h2>수급 발자국 <span id="flownote">최근 20거래일</span></h2>
 <div class="flow" id="flow"></div>
+<div class="flowadvice" id="flowadvice" style="display:none"></div>
 
 <h2>국내주식 데이터 연결</h2>
 <div class="cfg">
@@ -582,11 +603,19 @@ function loadSim(asset){
    3. 채널 정의 · 렌더링
    ═══════════════════════════════════════════════════════════ */
 const ASSETS=[
-  {id:'KRW-BTC',name:'비트코인',type:'coin',seed:47,tilt:.55},
-  {id:'KRW-XRP',name:'리플',type:'coin',seed:73,tilt:.24},
-  {id:'KRW-ETH',name:'이더리움',type:'coin',seed:59,tilt:.46},
-  {id:'005930',name:'삼성전자',type:'stock',seed:11,tilt:.62},
-  {id:'000660',name:'SK하이닉스',type:'stock',seed:29,tilt:.38},
+  {id:'KRW-BTC', name:'비트코인',  type:'coin', seed:47, tilt:.55},
+  {id:'KRW-ETH', name:'이더리움',  type:'coin', seed:59, tilt:.46},
+  {id:'KRW-XRP', name:'리플',      type:'coin', seed:73, tilt:.24},
+  {id:'KRW-SOL', name:'솔라나',    type:'coin', seed:31, tilt:.50},
+  {id:'KRW-DOGE',name:'도지코인',  type:'coin', seed:88, tilt:.18},
+  /* 국내주식은 섹터가 겹치지 않도록 대표 1종목씩 */
+  {id:'005930',  name:'삼성전자',           type:'stock', sector:'반도체',   seed:11, tilt:.62},
+  {id:'247540',  name:'에코프로비엠',       type:'stock', sector:'2차전지',  seed:41, tilt:.30},
+  {id:'005380',  name:'현대차',             type:'stock', sector:'자동차',   seed:23, tilt:.48},
+  {id:'207940',  name:'삼성바이오로직스',   type:'stock', sector:'바이오',   seed:67, tilt:.52},
+  {id:'035420',  name:'NAVER',              type:'stock', sector:'인터넷',   seed:53, tilt:.35},
+  {id:'012450',  name:'한화에어로스페이스', type:'stock', sector:'방산',     seed:19, tilt:.58},
+  {id:'105560',  name:'KB금융',             type:'stock', sector:'금융',     seed:77, tilt:.44},
 ];
 
 const CHANNELS=[
@@ -636,35 +665,74 @@ const PHASES=[
 
 const CV=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
 
+/* 세그먼트 막대 게이지 — 반원 계기판을 대체한다.
+   구간대(안전/주의/위험)를 배경 띠로 깔고, 값만큼 채운 뒤 현재 위치에 마커를 세운다.
+   눈금이 왼→오 한 방향이라 여러 카드를 위아래로 훑을 때 비교가 쉽다. */
 function drawGauge(cv,val,big,forceColor){
-  const ctx=cv.getContext('2d'),W=+cv.getAttribute('width'),H=+cv.getAttribute('height');
-  const dpr=window.devicePixelRatio||1;
+  const W=+cv.getAttribute('width'),H=+cv.getAttribute('height');
+  const ctx=cv.getContext('2d'),dpr=window.devicePixelRatio||1;
   if(cv.dataset.s!=='1'){cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
     ctx.scale(dpr,dpr);cv.dataset.s='1'}
   ctx.clearRect(0,0,W,H);
-  const cx=W/2,cy=H-14,R=Math.min(W/2-12,H-26),lw=big?13:9;
-  const A0=Math.PI,A1=2*Math.PI,ang=v=>A0+(v/100)*(A1-A0);
-  ctx.lineWidth=lw;ctx.lineCap='butt';
-  ctx.strokeStyle=CV('--line');ctx.beginPath();ctx.arc(cx,cy,R,A0,A1);ctx.stroke();
-  ctx.strokeStyle='rgba(229,52,43,.34)';ctx.beginPath();ctx.arc(cx,cy,R,ang(70),A1);ctx.stroke();
-  ctx.strokeStyle='rgba(63,178,127,.22)';ctx.beginPath();ctx.arc(cx,cy,R,A0,ang(30));ctx.stroke();
-  ctx.strokeStyle=CV('--dim');ctx.lineWidth=1;
-  for(let i=0;i<=10;i++){const a=ang(i*10),r1=R-lw/2-3,r2=R-lw/2-(i%5===0?9:5);
-    ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);
-    ctx.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);ctx.stroke()}
+
+  const pad=big?12:8, bh=big?24:14;
+  const x0=pad, x1=W-pad, bw=x1-x0;
+  const by=big?20:14;   // 위쪽에 마커 공간을 확보한다
+  const at=v=>x0+(Math.max(0,Math.min(100,v))/100)*bw;
+  const r=big?5:3;
+  const roundRect=(x,y,w,h,rr)=>{ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(x,y,Math.max(0.5,w),h,rr);else ctx.rect(x,y,Math.max(0.5,w),h);};
+
+  // 배경 트랙 + 구간대
+  ctx.fillStyle=CV('--panel2');roundRect(x0,by,bw,bh,r);ctx.fill();
+  ctx.fillStyle='rgba(63,178,127,.16)';roundRect(x0,by,at(30)-x0,bh,r);ctx.fill();
+  ctx.fillStyle='rgba(242,163,60,.13)';ctx.fillRect(at(30),by,at(70)-at(30),bh);
+  ctx.fillStyle='rgba(229,52,43,.18)';roundRect(at(70),by,x1-at(70),bh,r);ctx.fill();
+  ctx.strokeStyle=CV('--line');ctx.lineWidth=1;
+  roundRect(x0+.5,by+.5,bw-1,bh-1,r);ctx.stroke();
+
   if(val==null){
-    ctx.fillStyle=CV('--dim');ctx.font=`500 ${big?13:11}px ${CV('--mono').replace(/'/g,'')}`;
-    ctx.textAlign='center';ctx.fillText('NO DATA',cx,cy-R/2);return}
-  ctx.strokeStyle=forceColor||(val>=70?CV('--up'):val>=45?CV('--warn'):CV('--ok'));
-  ctx.lineWidth=lw;ctx.beginPath();ctx.arc(cx,cy,R,A0,ang(val));ctx.stroke();
-  const a=ang(val),nr=R-lw-4;
-  ctx.strokeStyle=CV('--ivory');ctx.lineWidth=big?3:2;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(cx-Math.cos(a)*8,cy-Math.sin(a)*8);
-  ctx.lineTo(cx+Math.cos(a)*nr,cy+Math.sin(a)*nr);ctx.stroke();
-  ctx.fillStyle=CV('--ivory');ctx.beginPath();ctx.arc(cx,cy,big?5:3.5,0,7);ctx.fill();
-  ctx.fillStyle=CV('--ink');ctx.beginPath();ctx.arc(cx,cy,big?2:1.5,0,7);ctx.fill();
-  if(big){ctx.fillStyle=CV('--dim');ctx.font=`500 10px ${CV('--mono').replace(/'/g,'')}`;
-    ctx.textAlign='center';ctx.fillText('0',cx-R,cy+13);ctx.fillText('100',cx+R,cy+13)}
+    ctx.fillStyle=CV('--dim');
+    ctx.font=`500 ${big?12:10}px ${CV('--mono').replace(/'/g,'')}`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('NO DATA',x0+bw/2,by+bh/2);
+    return;
+  }
+
+  // 값 채움 — 촘촘한 세그먼트로 쌓아 '막대 데이터' 느낌을 준다
+  const col=forceColor||(val>=70?CV('--up'):val>=45?CV('--warn'):CV('--ok'));
+  const fillW=at(val)-x0, seg=big?7:5, gap=big?2.5:1.8;
+  ctx.save();
+  roundRect(x0,by,fillW,bh,r);ctx.clip();
+  ctx.fillStyle=col;
+  for(let x=x0;x<x0+fillW;x+=seg+gap)
+    ctx.fillRect(x,by+2,Math.min(seg,x0+fillW-x),bh-4);
+  ctx.restore();
+
+  // 현재 위치 마커
+  const mx=at(val);
+  ctx.fillStyle=CV('--ivory');
+  ctx.fillRect(mx-1,by-(big?5:3),2,bh+(big?10:6));
+  ctx.beginPath();
+  ctx.moveTo(mx,by-(big?7:5));
+  ctx.lineTo(mx-(big?5:3.5),by-(big?14:10));
+  ctx.lineTo(mx+(big?5:3.5),by-(big?14:10));
+  ctx.closePath();ctx.fill();
+
+  // 눈금
+  ctx.strokeStyle=CV('--dim');ctx.lineWidth=1;
+  for(let i=0;i<=10;i++){
+    const x=at(i*10),len=i%5===0?(big?7:5):(big?4:3);
+    ctx.beginPath();ctx.moveTo(x,by+bh+2);ctx.lineTo(x,by+bh+2+len);ctx.stroke();
+  }
+  if(big){
+    ctx.fillStyle=CV('--dim');
+    ctx.font=`500 10px ${CV('--mono').replace(/'/g,'')}`;
+    ctx.textBaseline='top';
+    ctx.textAlign='left';   ctx.fillText('0',x0,by+bh+12);
+    ctx.textAlign='center'; ctx.fillText('50',at(50),by+bh+12);
+    ctx.textAlign='right';  ctx.fillText('100',x1,by+bh+12);
+  }
 }
 
 function drawSpark(cv,series){
@@ -706,54 +774,144 @@ function render(asset,data){
     ?`<span class="ok">● 실시간</span>`
     :`<span class="warn">● 시뮬레이션 — 프록시 미연결</span>`;
 
+  /* 카드 노출 규칙
+     - 자산군에 애초에 해당 없는 지표(코인의 대차잔고 등)는 완전히 숨긴다.
+     - 해당되지만 지금 값이 없는 지표는 카드에서 빼되, 아래 접이식 목록에
+       사유만 남긴다. 조용히 사라지면 "왜 없지?"를 알 수 없기 때문이다. */
   const grid=el('grid');grid.innerHTML='';
   const reasons=data.reasons||{};
+  const pending=[];
+  let shown=0;
+
   CHANNELS.forEach(c=>{
     const applies=c.only==='both'||c.only===asset.type;
+    if(!applies)return;                       // 해당 없음 → 흔적 없이 숨김
     const val=ch[c.key];
-    const ok=applies&&val!=null;
-    const [st,sc]=ok?c.state(val):['',''];
-    let tagCls=ok?(data.live?'live':'sim'):'';
+    if(val==null){                            // 해당되지만 값 없음 → 사유만 접어둠
+      pending.push([c.name,reasons[c.key]||'데이터가 연결되지 않았습니다']);
+      return;
+    }
+    shown++;
+    const [st,sc]=c.state(val);
     let tagTxt=c.tag;
     if(c.key==='flow'&&data.flowMethod==='whale-bias')tagTxt='WHALE BIAS';
-    const why=reasons[c.key];
     const card=document.createElement('div');
-    card.className='card'+(ok?'':' na');
+    card.className='card';
     card.innerHTML=`
       <div class="chead"><div class="cname">${c.name}</div>
-        <div class="ctag ${tagCls}">${tagTxt}</div></div>
+        <div class="ctag ${data.live?'live':'sim'}">${tagTxt}</div></div>
       <p class="cdesc">${c.desc}</p>
-      <div class="cbody"><canvas width="118" height="72"></canvas>
-        <div><div class="cnum ${ok?sc:'mut'}">${ok?val:'—'}<span class="cunit">${ok?c.unit:''}</span></div>
-        <div class="cstate ${ok?sc:'mut'}">${ok?st:(applies?'계산 보류':
-          asset.type==='stock'?'코인 전용 지표':'주식 전용 지표')}</div></div></div>
-      <p class="cread">${ok?c.read(val):(applies?
-        (why||'해당 소스가 연결되지 않았습니다.'):'이 자산군에는 해당하지 않습니다.')}</p>`;
+      <div class="cbody"><canvas width="150" height="46"></canvas>
+        <div><div class="cnum ${sc}">${val}<span class="cunit">${c.unit}</span></div>
+        <div class="cstate ${sc}">${st}</div></div></div>
+      <p class="cread">${c.read(val)}</p>`;
     grid.appendChild(card);
-    const cvs=card.querySelector('canvas');
-    drawGauge(cvs,ok?val:null,false);
-    if(!ok)cvs.style.opacity=.35;
+    drawGauge(card.querySelector('canvas'),val,false);
   });
 
+  if(!shown){
+    const empty=document.createElement('p');
+    empty.className='mut';empty.style.cssText='margin:0;font-size:12.5px';
+    empty.textContent='표시할 수 있는 지표가 없습니다. 데이터 연결을 확인하세요.';
+    grid.appendChild(empty);
+  }
+
+  const pend=el('pending');
+  if(pending.length){
+    pend.style.display='';
+    pend.innerHTML=`<summary>표시되지 않은 지표 ${pending.length}개 — 이유 보기</summary>`+
+      pending.map(([n,why])=>`<div class="prow"><b>${n}</b><span>${why}</span></div>`).join('');
+  }else pend.style.display='none';
+
+  /* ── 수급 발자국 + 초보자용 해석 ────────────────────────
+     막대만 보여주면 "그래서 어쩌라고"가 된다.
+     줄마다 무슨 뜻인지 한 줄로 풀고, 맨 아래 종합 조언을 붙인다. */
   const rows=data.series||[];
   el('flownote').textContent=asset.type==='coin'?'최근 20일 · 코인 대체지표':'최근 20거래일';
   const flow=el('flow');
-  if(!rows.length){flow.innerHTML='<p class="mut" style="margin:0;font-size:12.5px">수급 데이터가 연결되지 않았습니다.</p>';}
-  else{
+  const advice=el('flowadvice');
+
+  if(!rows.length){
+    flow.innerHTML='<p class="mut" style="margin:0;font-size:12.5px">수급 데이터가 연결되지 않았습니다.</p>';
+    advice.style.display='none';
+  }else{
     flow.innerHTML=rows.map(([n])=>`<div class="frow"><div class="fname">${n}</div>
-      <div class="fspark"><canvas></canvas></div><div class="fval"></div><div class="fstreak"></div></div>`).join('');
+      <div class="fspark"><canvas></canvas></div><div class="fval"></div><div class="fstreak"></div>
+      <div class="fread"></div></div>`).join('');
+
+    const stats=[];
     [...flow.querySelectorAll('.frow')].forEach((row,i)=>{
-      const s=rows[i][1]||[];if(!s.length)return;
-      const sum=s.slice(-5).reduce((a,b)=>a+b,0);
-      let streak=0;const sg=Math.sign(s.at(-1));
-      for(let k=s.length-1;k>=0;k--){if(Math.sign(s[k])===sg&&sg!==0)streak++;else break}
-      drawSpark(row.querySelector('canvas'),s);
+      const [name,series]=rows[i];
+      const sv=series||[];if(!sv.length)return;
+      const sum=sv.slice(-5).reduce((a,b)=>a+b,0);
+      const sg=Math.sign(sv.at(-1));
+      let streak=0;
+      for(let k=sv.length-1;k>=0;k--){if(Math.sign(sv[k])===sg&&sg!==0)streak++;else break}
+      drawSpark(row.querySelector('canvas'),sv);
       const fv=row.querySelector('.fval');
       fv.textContent=(sum>=0?'+':'')+sum.toLocaleString();
       fv.className='fval '+(sum>=0?'up':'down');
       row.querySelector('.fstreak').textContent=streak+'일 연속';
+      const read=flowRead(name,sum,streak,sg,asset.type);
+      row.querySelector('.fread').textContent=read;
+      stats.push({name,sum,streak,sg});
     });
+
+    const tip=flowAdvice(stats,asset.type);
+    if(tip){advice.style.display='';advice.innerHTML=
+      `<div class="fatitle">이 표를 읽는 법</div><p>${tip}</p>`;}
+    else advice.style.display='none';
   }
+}
+
+/* 줄별 한 줄 해석 — 숫자가 아니라 "무슨 일이 벌어지는 중인지"를 말한다 */
+function flowRead(name,sum,streak,sign,type){
+  const buying=sum>0;
+  const strong=streak>=4;
+  if(type==='coin'){
+    if(name==='가격 방향')
+      return buying?'최근 5일 가격이 위로 밀렸습니다.':'최근 5일 가격이 아래로 눌렸습니다.';
+    if(name==='거래량 편향')
+      return buying?'오르는 날에 거래가 더 붙었습니다. 관심이 들어오는 중입니다.'
+                  :'내리는 날에 거래가 더 붙었습니다. 물량이 나오는 중입니다.';
+    return buying?'큰 체결이 매수 쪽에 몰렸습니다.':'큰 체결이 매도 쪽에 몰렸습니다.';
+  }
+  const who=name==='개인'?'개인':name;
+  if(name==='개인')
+    return buying?'개인이 받아주고 있습니다. 개인이 사는 쪽은 대개 세력이 넘기는 쪽입니다.'
+                :'개인이 팔고 나가는 중입니다.';
+  return buying
+    ? (strong?`${who}이 ${streak}일 연속 담고 있습니다. 가장 믿을 만한 신호입니다.`
+             :`${who}이 사는 쪽이지만 아직 짧습니다. 며칠 더 이어지는지 보세요.`)
+    : (strong?`${who}이 ${streak}일 연속 팔고 있습니다. 반등이 나와도 힘이 약합니다.`
+             :`${who}이 파는 쪽으로 돌아섰습니다.`);
+}
+
+/* 종합 조언 — 조합을 보고 초보자가 바로 행동으로 옮길 수 있는 문장으로 */
+function flowAdvice(stats,type){
+  if(!stats.length)return '';
+  const get=n=>stats.find(s=>s.name===n);
+  if(type==='coin'){
+    const vol=get('거래량 편향'),whale=get('대형체결 편향');
+    if(!vol||!whale)return '';
+    if(vol.sum>0&&whale.sum>0)
+      return '거래도 붙고 큰 체결도 매수 쪽입니다. 다만 이미 오른 뒤라면 <b>추격보다 눌림을 기다리는 편</b>이 안전합니다.';
+    if(vol.sum>0&&whale.sum<0)
+      return '거래는 늘었는데 큰 체결은 매도 쪽입니다. <b>관심이 몰릴 때 큰손이 넘기는 전형적인 모습</b>이라, 신규 진입은 미루는 게 낫습니다.';
+    if(vol.sum<0&&whale.sum>0)
+      return '조용한데 큰 체결은 매수 쪽입니다. <b>매집 초입일 수 있는 구간</b>이지만 확인에 시간이 걸립니다. 한 번에 담지 말고 나눠 접근하세요.';
+    return '거래도 줄고 큰 체결도 매도 쪽입니다. <b>서둘러 들어갈 이유가 없는 구간</b>입니다.';
+  }
+  const f=get('외국인'),ins=get('기관'),ind=get('개인');
+  if(!f||!ins)return '';
+  const both=f.sum>0&&ins.sum>0, neither=f.sum<0&&ins.sum<0;
+  if(both)
+    return '외국인과 기관이 <b>같은 방향으로 사고 있습니다.</b> 이 조합이 수급에서 가장 신뢰도가 높습니다. 다만 이미 많이 오른 자리면 분할로 접근하세요.';
+  if(neither)
+    return '외국인과 기관이 <b>둘 다 파는 중</b>입니다.'+
+      (ind&&ind.sum>0?' 그 물량을 개인이 받고 있는데, 이 구도에서 개인이 이기는 경우는 드뭅니다.':'')+
+      ' 반등이 나와도 신규 진입은 미루는 게 안전합니다.';
+  return '외국인과 기관의 <b>방향이 엇갈립니다.</b> 한쪽만 보고 판단하면 틀리기 쉬운 구간이니, 두 주체가 같은 방향으로 모일 때까지 기다리는 편이 낫습니다.';
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -806,7 +964,8 @@ async function load(asset){
 const picker=document.getElementById('picker');
 ASSETS.forEach(a=>{
   const b=document.createElement('button');
-  b.textContent=(a.type==='stock'?'▪ ':'◆ ')+a.name;
+  b.innerHTML=(a.type==='stock'?'▪ ':'◆ ')+a.name+
+    (a.sector?` <span class="psec">${a.sector}</span>`:'');
   b.setAttribute('aria-pressed',a.id===current.id);
   b.onclick=()=>{if(a.id===current.id)return;current=a;
     [...picker.children].forEach(c=>c.setAttribute('aria-pressed','false'));
