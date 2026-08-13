@@ -636,7 +636,7 @@ const PHASES=[
 
 const CV=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
 
-function drawGauge(cv,val,big){
+function drawGauge(cv,val,big,forceColor){
   const ctx=cv.getContext('2d'),W=+cv.getAttribute('width'),H=+cv.getAttribute('height');
   const dpr=window.devicePixelRatio||1;
   if(cv.dataset.s!=='1'){cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
@@ -655,7 +655,7 @@ function drawGauge(cv,val,big){
   if(val==null){
     ctx.fillStyle=CV('--dim');ctx.font=`500 ${big?13:11}px ${CV('--mono').replace(/'/g,'')}`;
     ctx.textAlign='center';ctx.fillText('NO DATA',cx,cy-R/2);return}
-  ctx.strokeStyle=val>=70?CV('--up'):val>=45?CV('--warn'):CV('--ok');
+  ctx.strokeStyle=forceColor||(val>=70?CV('--up'):val>=45?CV('--warn'):CV('--ok'));
   ctx.lineWidth=lw;ctx.beginPath();ctx.arc(cx,cy,R,A0,ang(val));ctx.stroke();
   const a=ang(val),nr=R-lw-4;
   ctx.strokeStyle=CV('--ivory');ctx.lineWidth=big?3:2;ctx.lineCap='round';
@@ -694,7 +694,9 @@ function render(asset,data){
   el('vtext').textContent=v.text;
   el('verdict').style.borderLeftColor=
     CV(v.tone==='up'?'--up':v.tone==='down'?'--down':v.tone==='warn'?'--warn':'--dim');
-  drawGauge(el('vgauge'),score,true);
+  const toneColor=v.tone==='up'?CV('--up'):v.tone==='warn'?CV('--warn'):
+    v.tone==='down'?CV('--down'):null;
+  drawGauge(el('vgauge'),score,true,toneColor);
 
   el('phases').innerHTML=PHASES.map((p,i)=>
     `<div class="ph${i===v.phase?' on':''}"><div class="n">0${i+1} — PHASE</div>
