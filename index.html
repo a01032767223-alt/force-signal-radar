@@ -173,11 +173,11 @@ footer code{font-family:var(--mono);color:var(--muted);font-size:11px}
     <button class="ghost" id="clear">지우기</button>
     <span id="cfgmsg" class="mut" style="font-size:11.5px"></span>
   </div>
-  <p>필수 경로는 <code>/ohlcv</code> 하나입니다. 나머지는 있으면 해당 채널이 켜지고, 없으면 그 카드만 사유와 함께 비워집니다 —
-     <code>/investor</code>(수급), <code>/short</code>(대차잔고),
-     <code>/orderbook</code>·<code>/trades</code>(허수율, 둘 다 필요).
+  <p>필수 경로는 <code>/ohlcv</code> 하나입니다. <code>/orderbook</code>·<code>/trades</code>(허수율)가 있으면 그 채널도 켜집니다.
      허수율은 호가를 2.5초 간격으로 4번 받아 계산하므로 주식 종목은 로딩에 10초쯤 걸립니다.
-     주소를 넣지 않으면 시뮬레이션 값으로 표시됩니다.</p>
+     주소를 넣지 않으면 시뮬레이션 값으로 표시됩니다.<br><br>
+     <b>투자자 수급·대차잔고는 현재 비활성화</b>되어 있습니다 — KRX 정보데이터시스템이 2025-12-27부로
+     회원제(로그인 필수)로 전환되어 비로그인 요청을 원천 차단하기 때문입니다. 나머지 채널은 정상 작동합니다.</p>
 </div>
 
 <h2>육안 확인 체크리스트</h2>
