@@ -131,6 +131,27 @@ button[aria-pressed="true"] .psec{color:var(--ink);opacity:.55}
   font-size:11px;color:var(--dim);font-family:var(--mono)}
 @media(max-width:520px){.pbhead{flex-wrap:wrap}}
 
+.sydir{display:flex;align-items:center;gap:14px;padding:12px 14px;margin:-16px -18px 15px;
+  border-radius:10px 10px 0 0;border-bottom:1px solid var(--line)}
+.sydiricon{font-size:22px;line-height:1;flex:0 0 auto;width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;border-radius:50%}
+.sydirlabel{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.sydirsub{font-size:12px;margin-top:2px;opacity:.85}
+.sydir-buy{background:rgba(229,52,43,.14)}
+.sydir-buy .sydiricon{background:var(--up);color:#2A0503}
+.sydir-buy .sydirlabel{color:var(--up)}
+.sydir-sell{background:rgba(30,99,208,.14)}
+.sydir-sell .sydiricon{background:var(--down);color:#04122E}
+.sydir-sell .sydirlabel{color:var(--down)}
+.sydir-watch{background:rgba(138,148,163,.12)}
+.sydir-watch .sydiricon{background:var(--muted);color:var(--ink)}
+.sydir-watch .sydirlabel{color:var(--ivory)}
+.sydir-null{background:rgba(92,102,116,.1)}
+.sydir-null .sydiricon{background:var(--dim);color:var(--ink)}
+.sydir-null .sydirlabel{color:var(--muted)}
+.syminor{margin:11px 0 0;font-size:11.5px;line-height:1.6;color:var(--dim);
+  padding:8px 10px;background:var(--panel2);border-radius:6px}
+
 .synth{margin-top:16px;border:1px solid var(--line);border-left:3px solid var(--dim);
   border-radius:10px;background:var(--panel);padding:16px 18px}
 .synth.up{border-left-color:var(--up)}.synth.down{border-left-color:var(--down)}
@@ -1118,56 +1139,91 @@ function synthesize(ch,score,missing){
   if(missing>0)notes.push(`채널 ${missing}개가 빠져 있어 종합 판단의 신뢰도가 그만큼 낮습니다.`);
 
   const bullN=bull.filter(x=>x.strong).length, bearN=bear.filter(x=>x.strong).length;
-  let stance,tone,body;
+  let stance,tone,body,direction;
 
   if(score==null){
-    stance='판단 보류';tone='mut';
+    stance='판단 보류';tone='mut';direction=null;
     body='유효한 채널이 없어 종합 판단을 낼 수 없습니다.';
   }else if(bullN>0&&bearN>0){
-    stance='신호 충돌';tone='warn';
+    stance='신호 충돌';tone='warn';direction='watch';
     body='매집 신호와 분산 신호가 동시에 잡힙니다. 세력이 한쪽에서 담고 다른 쪽에서 넘기는 중이거나, '+
          '주체가 여럿일 때 나타나는 모습입니다. 이런 구간은 방향이 잡힐 때까지 기다리는 쪽이 실수가 적습니다.';
   }else if(score>=72){
-    stance='분할 매수 검토';tone='up';
+    stance='분할 매수 검토';tone='up';direction='buy';
     body='여러 채널이 같은 방향으로 매집을 가리킵니다. 다만 이 판정은 "지금 사라"가 아니라 '+
          '"관심 종목에 올려두고 나눠서 접근할 만하다"는 뜻입니다. 한 번에 비중을 싣지 마세요.';
   }else if(score>=55){
-    stance='관심 유지 · 눌림 대기';tone='up';
+    stance='관심 유지 · 눌림 대기';tone='up';direction='buy';
     body='관심이 붙기 시작한 구간입니다. 이미 오른 자리를 추격하는 것과 매집 초입에 붙는 것은 '+
          '결과가 전혀 다릅니다. 조정을 기다렸다가 접근하는 편이 유리합니다.';
   }else if(score>=38){
-    stance='신규 진입 보류 · 보유분 관리';tone='warn';
+    // 이 구간은 진짜 애매하다. 억지로 매수·매도 어느 한쪽으로 우기지 않고
+    // "관망"으로 명확히 못박는 게 오히려 더 정직한 확답이다.
+    stance='신규 진입 보류 · 보유분 관리';tone='warn';direction='watch';
     body='넘기는 흔적이 섞여 있습니다. 새로 들어갈 자리는 아니고, 이미 갖고 있다면 '+
          '비중을 줄일지 먼저 정해두는 편이 낫습니다.';
   }else{
-    stance='회피 · 반등 시 비중 축소 검토';tone='down';
+    stance='회피 · 반등 시 비중 축소 검토';tone='down';direction='sell';
     body='큰 자금이 이미 빠져나간 자리로 보입니다. 싸 보이는 것과 바닥인 것은 다릅니다. '+
          '반등이 나오더라도 신규 진입보다 정리 기회로 보는 편이 안전합니다.';
   }
-  return{stance,tone,body,bull,bear,notes};
+  return{stance,tone,body,bull,bear,notes,direction};
 }
+
+const DIRECTION_COPY={
+  buy:{label:'매수 우위',sub:'지금은 매수 쪽에 무게가 실립니다',icon:'▲'},
+  sell:{label:'매도(정리) 우위',sub:'지금은 매도·비중 축소 쪽에 무게가 실립니다',icon:'▼'},
+  watch:{label:'관망',sub:'지금은 매수도 매도도 자신 있게 말하기 어려운 구간입니다',icon:'■'},
+  null:{label:'판단 불가',sub:'유효한 채널이 없습니다',icon:'—'},
+};
 
 function renderSynthesis(ch,asset,score,missing){
   const box=document.getElementById('synth');
   const r=synthesize(ch,score,missing);
   const li=(arr,cls)=>arr.map(x=>
     `<li class="${cls}${x.strong?' st':''}">${x.txt}</li>`).join('');
+  const dc=DIRECTION_COPY[r.direction===null?'null':r.direction];
+
+  /* 우세 방향과 반대쪽 근거를 동등한 무게로 나란히 보여주면
+     "긍정과 부정이 같이 있어 헷갈린다"는 문제가 그대로 재발한다.
+     그래서 관망(신호 충돌 포함)일 때만 양쪽을 동등하게 보여주고,
+     방향이 정해졌을 때는 우세 쪽만 정식 리스트로, 반대쪽은 작은 참고 문구로 접는다. */
+  let listsHtml='';
+  if(r.direction==='watch'){
+    listsHtml=(r.bull.length||r.bear.length)?`<div class="sylists">
+      ${r.bull.length?`<div><div class="sylab up">매집 쪽 근거</div><ul>${li(r.bull,'up')}</ul></div>`:''}
+      ${r.bear.length?`<div><div class="sylab down">분산 쪽 근거</div><ul>${li(r.bear,'down')}</ul></div>`:''}
+    </div>`:'';
+  }else{
+    const primary=r.direction==='buy'?r.bull:r.bear;
+    const secondary=r.direction==='buy'?r.bear:r.bull;
+    const pLab=r.direction==='buy'?'매집 쪽 근거':'분산 쪽 근거';
+    const pCls=r.direction==='buy'?'up':'down';
+    listsHtml=primary.length?`<div class="sylists">
+      <div><div class="sylab ${pCls}">${pLab}</div><ul>${li(primary,pCls)}</ul></div>
+    </div>`:'';
+    if(secondary.length)
+      listsHtml+=`<p class="syminor">참고 — 반대 방향 신호도 일부 있습니다: `+
+        secondary.map(x=>x.txt).join(', ')+'</p>';
+  }
+
   box.style.display='';
   box.className='synth '+r.tone;
   box.innerHTML=`
+    <div class="sydir sydir-${r.direction===null?'null':r.direction}">
+      <span class="sydiricon">${dc.icon}</span>
+      <div><div class="sydirlabel">${dc.label}</div><div class="sydirsub">${dc.sub}</div></div>
+    </div>
     <div class="syhead">
       <div class="sytitle">6채널 종합 판단</div>
       <div class="systance ${r.tone}">${r.stance}</div>
     </div>
     <p class="sybody">${r.body}</p>
-    ${(r.bull.length||r.bear.length)?`<div class="sylists">
-      ${r.bull.length?`<div><div class="sylab up">매집 쪽 근거</div><ul>${li(r.bull,'up')}</ul></div>`:''}
-      ${r.bear.length?`<div><div class="sylab down">분산 쪽 근거</div><ul>${li(r.bear,'down')}</ul></div>`:''}
-    </div>`:''}
+    ${listsHtml}
     ${r.notes.length?`<ul class="synotes">${r.notes.map(n=>`<li>${n}</li>`).join('')}</ul>`:''}
-    <p class="sydisc">이 판정은 과거 가격·거래량·호가에서 계산한 통계적 정황일 뿐, 투자 자문이 아닙니다.
+    <p class="sydisc">이 판정은 과거 가격·거래량·호가에서 계산한 통계적 정황이며, 투자 자문이 아닙니다.
       같은 신호가 정상적인 기관 매매에서도 나올 수 있고, 앞으로의 가격을 보장하지 않습니다.
-      최종 판단과 책임은 본인에게 있습니다.</p>`;
+      <b>매수·매도의 최종 결정과 그에 따른 책임은 전적으로 투자자 본인에게 있습니다.</b></p>`;
 }
 
 /* ── 눌림목 표시 ──────────────────────────────────────

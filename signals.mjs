@@ -221,16 +221,22 @@ export function detectPullback(candles) {
   const volumeContraction = avgVolSince < avgVolBase * 0.85;
 
   const yesterday = win.at(-2);
+  const sinceExclToday = since.slice(0, -1).map(c => c.volume);
   const reboundToday = today.close > yesterday.close &&
-    today.volume > mean(since.slice(0, -1).map(c => c.volume) || [today.volume]) * 1.15;
+    today.volume > (sinceExclToday.length ? mean(sinceExclToday) : today.volume) * 1.15;
+
+  const reasons = [];
+  if (!supportHeld) reasons.push('support');
+  if (dropPct > 18) reasons.push('drop');
+  if (daysElapsed > 15) reasons.push('duration');
 
   let state;
-  if (!supportHeld || dropPct > 18 || daysElapsed > 15) state = 'breakdown';
+  if (reasons.length) state = 'breakdown';
   else if (dropPct < 2) state = 'watching';
   else if (reboundToday) state = 'ending';
   else state = 'active';
 
-  return { state, daysElapsed, dropPct, volumeContraction, supportHeld,
+  return { state, daysElapsed, dropPct, volumeContraction, supportHeld, reasons,
     peakDate: peak.date, peakClose: peak.close, todayClose: today.close, ma20: Math.round(ma20) };
 }
 
