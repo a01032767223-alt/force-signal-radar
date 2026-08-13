@@ -45,7 +45,25 @@ h1 em{font-style:normal;color:var(--up)}
 .dot.err{background:var(--up)}
 @keyframes pulse{50%{box-shadow:0 0 0 7px rgba(63,178,127,0)}}
 
-.picker{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 6px}
+.mtabs{display:flex;gap:6px;margin:20px 0 12px;border-bottom:1px solid var(--line)}
+.mtab{font-family:var(--mono);font-size:12.5px;letter-spacing:.04em;background:none;
+  border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 14px 9px;
+  cursor:pointer;display:flex;align-items:center;gap:7px;margin-bottom:-1px}
+.mtab:hover{color:var(--ivory)}
+.mtab.on{color:var(--ivory);border-bottom-color:var(--up)}
+.mcnt{font-size:10px;color:var(--dim);background:var(--panel2);
+  border-radius:9px;padding:1px 6px}
+.mtab.on .mcnt{color:var(--ivory);background:rgba(229,52,43,.22)}
+.picker{margin:0 0 6px}
+.pgroup{display:flex;gap:12px;align-items:flex-start;padding:7px 0}
+.pglabel{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.06em;
+  flex:0 0 74px;padding-top:7px;text-align:right}
+.pgitems{display:flex;gap:7px;flex-wrap:wrap;flex:1;min-width:0}
+@media(max-width:560px){
+  .pgroup{flex-direction:column;gap:5px}
+  .pglabel{text-align:left;padding-top:0;flex:none}
+  .mtab{padding:8px 11px;font-size:12px}
+}
 .picker button{font-family:var(--mono);font-size:12px;letter-spacing:.04em;background:var(--panel2);
   color:var(--muted);border:1px solid var(--line);padding:9px 14px;border-radius:2px;cursor:pointer;transition:.15s}
 .picker button:hover{color:var(--ivory);border-color:var(--dim)}
@@ -69,6 +87,29 @@ h1 em{font-style:normal;color:var(--up)}
 .flowadvice p{margin:0;font-size:13px;line-height:1.72;color:var(--ivory)}
 .flowadvice b{color:var(--warn);font-weight:600}
 button[aria-pressed="true"] .psec{color:var(--ink);opacity:.55}
+.synth{margin-top:16px;border:1px solid var(--line);border-left:3px solid var(--dim);
+  border-radius:10px;background:var(--panel);padding:16px 18px}
+.synth.up{border-left-color:var(--up)}.synth.down{border-left-color:var(--down)}
+.synth.warn{border-left-color:var(--warn)}
+.syhead{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;margin-bottom:9px}
+.sytitle{font-size:14.5px;font-weight:700;letter-spacing:-.01em}
+.systance{font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;
+  border:1px solid currentColor;border-radius:5px;padding:3px 9px}
+.systance.up{color:var(--up)}.systance.down{color:var(--down)}
+.systance.warn{color:var(--warn)}.systance.mut{color:var(--muted)}
+.sybody{margin:0;font-size:13px;line-height:1.75;color:var(--ivory)}
+.sylists{display:flex;gap:22px;flex-wrap:wrap;margin-top:13px}
+.sylists>div{flex:1;min-width:180px}
+.sylab{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;margin-bottom:5px}
+.sylab.up{color:var(--up)}.sylab.down{color:var(--down)}
+.sylists ul{margin:0;padding-left:15px}
+.sylists li{font-size:12.5px;line-height:1.65;color:var(--muted);margin-bottom:2px}
+.sylists li.st{color:var(--ivory);font-weight:500}
+.synotes{margin:12px 0 0;padding-left:15px}
+.synotes li{font-size:12px;line-height:1.6;color:var(--warn);margin-bottom:3px}
+.sydisc{margin:13px 0 0;padding-top:11px;border-top:1px dashed var(--line);
+  font-size:11.5px;line-height:1.65;color:var(--dim)}
 .pending{margin-top:14px;border:1px solid var(--line);border-radius:8px;
   background:var(--panel2);padding:10px 13px}
 .pending summary{cursor:pointer;font-size:12px;color:var(--muted);
@@ -164,6 +205,7 @@ footer code{font-family:var(--mono);color:var(--muted);font-size:11px}
   <div class="stamp"><span class="dot" id="dot"></span><span id="stamp">대기 중</span></div>
 </header>
 
+<div class="mtabs" id="mtabs" role="tablist" aria-label="시장 선택"></div>
 <div class="picker" id="picker" role="group" aria-label="종목 선택"></div>
 
 <div class="verdict" id="verdict">
@@ -179,6 +221,7 @@ footer code{font-family:var(--mono);color:var(--muted);font-size:11px}
 
 <h2>6채널 신호 계기판 <span id="srcnote"></span></h2>
 <div class="grid" id="grid"></div>
+<div class="synth" id="synth" style="display:none"></div>
 <details class="pending" id="pending" style="display:none"></details>
 
 <h2>수급 발자국 <span id="flownote">최근 20거래일</span></h2>
@@ -602,20 +645,63 @@ function loadSim(asset){
 /* ═══════════════════════════════════════════════════════════
    3. 채널 정의 · 렌더링
    ═══════════════════════════════════════════════════════════ */
+const MARKETS=[['crypto','암호화폐'],['kospi','코스피'],['kosdaq','코스닥']];
+
+/* 종목 코드는 사람이 적어 넣은 값이라 오타가 있을 수 있다.
+   잘못된 코드는 시세 조회에서 그대로 오류로 드러나므로, 그때 해당 줄만 고치면 된다. */
 const ASSETS=[
-  {id:'KRW-BTC', name:'비트코인',  type:'coin', seed:47, tilt:.55},
-  {id:'KRW-ETH', name:'이더리움',  type:'coin', seed:59, tilt:.46},
-  {id:'KRW-XRP', name:'리플',      type:'coin', seed:73, tilt:.24},
-  {id:'KRW-SOL', name:'솔라나',    type:'coin', seed:31, tilt:.50},
-  {id:'KRW-DOGE',name:'도지코인',  type:'coin', seed:88, tilt:.18},
-  /* 국내주식은 섹터가 겹치지 않도록 대표 1종목씩 */
-  {id:'005930',  name:'삼성전자',           type:'stock', sector:'반도체',   seed:11, tilt:.62},
-  {id:'247540',  name:'에코프로비엠',       type:'stock', sector:'2차전지',  seed:41, tilt:.30},
-  {id:'005380',  name:'현대차',             type:'stock', sector:'자동차',   seed:23, tilt:.48},
-  {id:'207940',  name:'삼성바이오로직스',   type:'stock', sector:'바이오',   seed:67, tilt:.52},
-  {id:'035420',  name:'NAVER',              type:'stock', sector:'인터넷',   seed:53, tilt:.35},
-  {id:'012450',  name:'한화에어로스페이스', type:'stock', sector:'방산',     seed:19, tilt:.58},
-  {id:'105560',  name:'KB금융',             type:'stock', sector:'금융',     seed:77, tilt:.44},
+  /* ── 암호화폐 ─────────────────────────── */
+  {id:'KRW-BTC', name:'비트코인',   type:'coin', market:'crypto', sector:'대장주',   seed:47,tilt:.55},
+  {id:'KRW-ETH', name:'이더리움',   type:'coin', market:'crypto', sector:'대장주',   seed:59,tilt:.46},
+  {id:'KRW-XRP', name:'리플',       type:'coin', market:'crypto', sector:'결제',     seed:73,tilt:.24},
+  {id:'KRW-SOL', name:'솔라나',     type:'coin', market:'crypto', sector:'플랫폼',   seed:31,tilt:.50},
+  {id:'KRW-DOGE',name:'도지코인',   type:'coin', market:'crypto', sector:'밈',       seed:88,tilt:.18},
+
+  /* ── 코스피 · 섹터당 3종목 ─────────────── */
+  {id:'005930',name:'삼성전자',            type:'stock',market:'kospi',sector:'반도체',   seed:11,tilt:.62},
+  {id:'000660',name:'SK하이닉스',          type:'stock',market:'kospi',sector:'반도체',   seed:29,tilt:.38},
+  {id:'042700',name:'한미반도체',          type:'stock',market:'kospi',sector:'반도체',   seed:83,tilt:.44},
+
+  {id:'373220',name:'LG에너지솔루션',      type:'stock',market:'kospi',sector:'2차전지',  seed:37,tilt:.33},
+  {id:'006400',name:'삼성SDI',             type:'stock',market:'kospi',sector:'2차전지',  seed:61,tilt:.29},
+  {id:'005490',name:'POSCO홀딩스',         type:'stock',market:'kospi',sector:'2차전지',  seed:17,tilt:.41},
+
+  {id:'005380',name:'현대차',              type:'stock',market:'kospi',sector:'자동차',   seed:23,tilt:.48},
+  {id:'000270',name:'기아',                type:'stock',market:'kospi',sector:'자동차',   seed:71,tilt:.51},
+  {id:'012330',name:'현대모비스',          type:'stock',market:'kospi',sector:'자동차',   seed:43,tilt:.39},
+
+  {id:'207940',name:'삼성바이오로직스',    type:'stock',market:'kospi',sector:'바이오',   seed:67,tilt:.52},
+  {id:'068270',name:'셀트리온',            type:'stock',market:'kospi',sector:'바이오',   seed:13,tilt:.36},
+  {id:'000100',name:'유한양행',            type:'stock',market:'kospi',sector:'바이오',   seed:97,tilt:.47},
+
+  {id:'035420',name:'NAVER',               type:'stock',market:'kospi',sector:'인터넷',   seed:53,tilt:.35},
+  {id:'035720',name:'카카오',              type:'stock',market:'kospi',sector:'인터넷',   seed:79,tilt:.27},
+  {id:'259960',name:'크래프톤',            type:'stock',market:'kospi',sector:'인터넷',   seed:31,tilt:.43},
+
+  {id:'012450',name:'한화에어로스페이스',  type:'stock',market:'kospi',sector:'방산·조선',seed:19,tilt:.58},
+  {id:'329180',name:'HD현대중공업',        type:'stock',market:'kospi',sector:'방산·조선',seed:89,tilt:.56},
+  {id:'047810',name:'한국항공우주',        type:'stock',market:'kospi',sector:'방산·조선',seed:41,tilt:.49},
+
+  {id:'105560',name:'KB금융',              type:'stock',market:'kospi',sector:'금융',     seed:77,tilt:.44},
+  {id:'055550',name:'신한지주',            type:'stock',market:'kospi',sector:'금융',     seed:59,tilt:.42},
+  {id:'000810',name:'삼성화재',            type:'stock',market:'kospi',sector:'금융',     seed:7, tilt:.40},
+
+  /* ── 코스닥 · 섹터당 3종목 ─────────────── */
+  {id:'247540',name:'에코프로비엠',        type:'stock',market:'kosdaq',sector:'2차전지', seed:41,tilt:.30},
+  {id:'086520',name:'에코프로',            type:'stock',market:'kosdaq',sector:'2차전지', seed:63,tilt:.28},
+  {id:'066970',name:'엘앤에프',            type:'stock',market:'kosdaq',sector:'2차전지', seed:91,tilt:.26},
+
+  {id:'196170',name:'알테오젠',            type:'stock',market:'kosdaq',sector:'바이오',  seed:27,tilt:.54},
+  {id:'141080',name:'리가켐바이오',        type:'stock',market:'kosdaq',sector:'바이오',  seed:49,tilt:.50},
+  {id:'145020',name:'휴젤',                type:'stock',market:'kosdaq',sector:'바이오',  seed:73,tilt:.45},
+
+  {id:'058470',name:'리노공업',            type:'stock',market:'kosdaq',sector:'반도체',  seed:33,tilt:.53},
+  {id:'039030',name:'이오테크닉스',        type:'stock',market:'kosdaq',sector:'반도체',  seed:57,tilt:.46},
+  {id:'240810',name:'원익IPS',             type:'stock',market:'kosdaq',sector:'반도체',  seed:81,tilt:.37},
+
+  {id:'263750',name:'펄어비스',            type:'stock',market:'kosdaq',sector:'게임·엔터',seed:15,tilt:.31},
+  {id:'041510',name:'에스엠',              type:'stock',market:'kosdaq',sector:'게임·엔터',seed:69,tilt:.34},
+  {id:'035900',name:'JYP Ent.',            type:'stock',market:'kosdaq',sector:'게임·엔터',seed:93,tilt:.32},
 ];
 
 const CHANNELS=[
@@ -669,7 +755,15 @@ const CV=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim(
    구간대(안전/주의/위험)를 배경 띠로 깔고, 값만큼 채운 뒤 현재 위치에 마커를 세운다.
    눈금이 왼→오 한 방향이라 여러 카드를 위아래로 훑을 때 비교가 쉽다. */
 function drawGauge(cv,val,big,forceColor){
-  const W=+cv.getAttribute('width'),H=+cv.getAttribute('height');
+  /* canvas.width에 값을 넣으면 width 속성 자체가 바뀐다.
+     그래서 논리 크기를 처음 한 번만 읽어 dataset에 보관한다.
+     안 그러면 두 번째 호출부터 W가 배로 커져 막대가 화면 밖까지 그려지고,
+     점수와 무관하게 늘 꽉 찬 것처럼 보인다. */
+  if(!cv.dataset.w){
+    cv.dataset.w=cv.getAttribute('width');
+    cv.dataset.h=cv.getAttribute('height');
+  }
+  const W=+cv.dataset.w,H=+cv.dataset.h;
   const ctx=cv.getContext('2d'),dpr=window.devicePixelRatio||1;
   if(cv.dataset.s!=='1'){cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
     ctx.scale(dpr,dpr);cv.dataset.s='1'}
@@ -816,6 +910,8 @@ function render(asset,data){
     grid.appendChild(empty);
   }
 
+  renderSynthesis(ch,asset,score,pending.length);
+
   const pend=el('pending');
   if(pending.length){
     pend.style.display='';
@@ -862,6 +958,92 @@ function render(asset,data){
       `<div class="fatitle">이 표를 읽는 법</div><p>${tip}</p>`;}
     else advice.style.display='none';
   }
+}
+
+/* ── 6채널 종합 판단 ────────────────────────────────
+   채널 하나만 보면 늘 틀린다. 여러 채널이 같은 말을 하는지,
+   서로 어긋나는지를 세어서 지금 어떤 국면인지 정리하고
+   그에 맞는 대응을 제시한다. 예측이 아니라 대응 원칙이다. */
+const SYN_RULES=[
+  {key:'accum',  dir:+1,hi:70,mid:45,
+   hiT:'매집 강도가 높습니다',            midT:'매집 흔적이 일부 보입니다'},
+  {key:'smart',  dir:+1,hi:70,mid:45,
+   hiT:'외국인·기관이 동반 순매수 중입니다', midT:'큰손 중 한쪽만 사고 있습니다'},
+  {key:'distrib',dir:-1,hi:70,mid:45,
+   hiT:'분산 경보가 켜졌습니다',           midT:'상단 저항이 감지됩니다'},
+  {key:'short',  dir:-1,hi:70,mid:45,
+   hiT:'대차잔고가 급증했습니다',          midT:'대차잔고가 늘고 있습니다'},
+  {key:'flow',   dir:-1,hi:70,mid:45,
+   hiT:'거래소로 매도 물량이 들어옵니다',  midT:'매도 체결이 우세합니다'},
+];
+
+function synthesize(ch,score,missing){
+  const bull=[],bear=[],notes=[];
+  SYN_RULES.forEach(r=>{
+    const v=ch[r.key];if(v==null)return;
+    const strong=v>=r.hi,mild=v>=r.mid;
+    if(!mild&&r.dir===+1){return}
+    if(!mild&&r.dir===-1){return}
+    const txt=strong?r.hiT:r.midT;
+    (r.dir===+1?bull:bear).push({txt,strong});
+  });
+  // 허수율은 방향이 아니라 "신뢰도"를 깎는 채널이다
+  const sp=ch.spoof;
+  if(sp!=null&&sp>=70)notes.push('호가 허수율이 높아 호가창에 보이는 매수·매도벽을 근거로 삼기 어렵습니다.');
+  else if(sp!=null&&sp>=45)notes.push('호가 취소가 잦은 편이라 호가창만 보고 판단하지 마세요.');
+  if(missing>0)notes.push(`채널 ${missing}개가 빠져 있어 종합 판단의 신뢰도가 그만큼 낮습니다.`);
+
+  const bullN=bull.filter(x=>x.strong).length, bearN=bear.filter(x=>x.strong).length;
+  let stance,tone,body;
+
+  if(score==null){
+    stance='판단 보류';tone='mut';
+    body='유효한 채널이 없어 종합 판단을 낼 수 없습니다.';
+  }else if(bullN>0&&bearN>0){
+    stance='신호 충돌';tone='warn';
+    body='매집 신호와 분산 신호가 동시에 잡힙니다. 세력이 한쪽에서 담고 다른 쪽에서 넘기는 중이거나, '+
+         '주체가 여럿일 때 나타나는 모습입니다. 이런 구간은 방향이 잡힐 때까지 기다리는 쪽이 실수가 적습니다.';
+  }else if(score>=72){
+    stance='분할 매수 검토';tone='up';
+    body='여러 채널이 같은 방향으로 매집을 가리킵니다. 다만 이 판정은 "지금 사라"가 아니라 '+
+         '"관심 종목에 올려두고 나눠서 접근할 만하다"는 뜻입니다. 한 번에 비중을 싣지 마세요.';
+  }else if(score>=55){
+    stance='관심 유지 · 눌림 대기';tone='up';
+    body='관심이 붙기 시작한 구간입니다. 이미 오른 자리를 추격하는 것과 매집 초입에 붙는 것은 '+
+         '결과가 전혀 다릅니다. 조정을 기다렸다가 접근하는 편이 유리합니다.';
+  }else if(score>=38){
+    stance='신규 진입 보류 · 보유분 관리';tone='warn';
+    body='넘기는 흔적이 섞여 있습니다. 새로 들어갈 자리는 아니고, 이미 갖고 있다면 '+
+         '비중을 줄일지 먼저 정해두는 편이 낫습니다.';
+  }else{
+    stance='회피 · 반등 시 비중 축소 검토';tone='down';
+    body='큰 자금이 이미 빠져나간 자리로 보입니다. 싸 보이는 것과 바닥인 것은 다릅니다. '+
+         '반등이 나오더라도 신규 진입보다 정리 기회로 보는 편이 안전합니다.';
+  }
+  return{stance,tone,body,bull,bear,notes};
+}
+
+function renderSynthesis(ch,asset,score,missing){
+  const box=document.getElementById('synth');
+  const r=synthesize(ch,score,missing);
+  const li=(arr,cls)=>arr.map(x=>
+    `<li class="${cls}${x.strong?' st':''}">${x.txt}</li>`).join('');
+  box.style.display='';
+  box.className='synth '+r.tone;
+  box.innerHTML=`
+    <div class="syhead">
+      <div class="sytitle">6채널 종합 판단</div>
+      <div class="systance ${r.tone}">${r.stance}</div>
+    </div>
+    <p class="sybody">${r.body}</p>
+    ${(r.bull.length||r.bear.length)?`<div class="sylists">
+      ${r.bull.length?`<div><div class="sylab up">매집 쪽 근거</div><ul>${li(r.bull,'up')}</ul></div>`:''}
+      ${r.bear.length?`<div><div class="sylab down">분산 쪽 근거</div><ul>${li(r.bear,'down')}</ul></div>`:''}
+    </div>`:''}
+    ${r.notes.length?`<ul class="synotes">${r.notes.map(n=>`<li>${n}</li>`).join('')}</ul>`:''}
+    <p class="sydisc">이 판정은 과거 가격·거래량·호가에서 계산한 통계적 정황일 뿐, 투자 자문이 아닙니다.
+      같은 신호가 정상적인 기관 매매에서도 나올 수 있고, 앞으로의 가격을 보장하지 않습니다.
+      최종 판단과 책임은 본인에게 있습니다.</p>`;
 }
 
 /* 줄별 한 줄 해석 — 숫자가 아니라 "무슨 일이 벌어지는 중인지"를 말한다 */
@@ -961,17 +1143,51 @@ async function load(asset){
   lastData=data;render(asset,data);
 }
 
+/* 종목이 38개라 한 줄로 늘어놓으면 못 찾는다.
+   시장 탭 → 섹터 묶음 2단계로 접어서 보여준다. */
 const picker=document.getElementById('picker');
-ASSETS.forEach(a=>{
-  const b=document.createElement('button');
-  b.innerHTML=(a.type==='stock'?'▪ ':'◆ ')+a.name+
-    (a.sector?` <span class="psec">${a.sector}</span>`:'');
-  b.setAttribute('aria-pressed',a.id===current.id);
-  b.onclick=()=>{if(a.id===current.id)return;current=a;
-    [...picker.children].forEach(c=>c.setAttribute('aria-pressed','false'));
-    b.setAttribute('aria-pressed','true');load(a)};
-  picker.appendChild(b);
+const mtabs=document.getElementById('mtabs');
+let curMarket=current.market;
+
+function renderTabs(){
+  mtabs.innerHTML=MARKETS.map(([k,label])=>{
+    const n=ASSETS.filter(a=>a.market===k).length;
+    return `<button class="mtab${k===curMarket?' on':''}" data-m="${k}"
+      aria-pressed="${k===curMarket}">${label}<span class="mcnt">${n}</span></button>`;
+  }).join('');
+}
+
+function renderPicker(){
+  const list=ASSETS.filter(a=>a.market===curMarket);
+  const bySector=[];
+  list.forEach(a=>{
+    let g=bySector.find(x=>x[0]===a.sector);
+    if(!g){g=[a.sector,[]];bySector.push(g)}
+    g[1].push(a);
+  });
+  picker.innerHTML=bySector.map(([sec,items])=>
+    `<div class="pgroup"><div class="pglabel">${sec}</div><div class="pgitems">`+
+    items.map(a=>`<button data-id="${a.id}" aria-pressed="${a.id===current.id}">`+
+      `${a.type==='stock'?'▪ ':'◆ '}${a.name}</button>`).join('')+
+    `</div></div>`).join('');
+}
+
+mtabs.addEventListener('click',e=>{
+  const b=e.target.closest('.mtab');if(!b)return;
+  curMarket=b.dataset.m;renderTabs();renderPicker();
 });
+
+picker.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-id]');if(!b)return;
+  const a=ASSETS.find(x=>x.id===b.dataset.id);
+  if(!a||a.id===current.id)return;
+  current=a;
+  picker.querySelectorAll('button[data-id]').forEach(c=>c.setAttribute('aria-pressed','false'));
+  b.setAttribute('aria-pressed','true');
+  load(a);
+});
+
+renderTabs();renderPicker();
 
 const proxyInput=document.getElementById('proxy');
 proxyInput.value=getProxy();
