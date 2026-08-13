@@ -56,6 +56,18 @@ h1 em{font-style:normal;color:var(--up)}
 .mtab.on .mcnt{color:var(--ivory);background:rgba(229,52,43,.22)}
 .picker{margin:0 0 6px}
 .pgroup{display:flex;gap:12px;align-items:flex-start;padding:7px 0}
+.pgflat{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:2px 0 6px}
+.pgflatbtn{display:flex;flex-direction:column;align-items:flex-start;gap:3px;
+  font-family:var(--mono);background:var(--panel2);color:var(--muted);
+  border:1px solid var(--line);border-radius:4px;padding:10px 12px;cursor:pointer;
+  transition:.15s;text-align:left;width:100%}
+.pgflatbtn:hover{color:var(--ivory);border-color:var(--dim)}
+.pgflatbtn[aria-pressed="true"]{background:var(--ivory);border-color:var(--ivory)}
+.pfname{font-size:12.5px;font-weight:600;letter-spacing:.02em}
+.pfsec{font-size:10px;color:var(--dim);letter-spacing:.02em}
+.pgflatbtn[aria-pressed="true"] .pfname{color:var(--ink)}
+.pgflatbtn[aria-pressed="true"] .pfsec{color:var(--ink);opacity:.6}
+@media(min-width:561px) and (max-width:860px){.pgflat{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .pglabel{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.06em;
   flex:0 0 74px;padding-top:7px;text-align:right}
 .pgitems{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;flex:1;min-width:0}
@@ -66,6 +78,7 @@ h1 em{font-style:normal;color:var(--up)}
   .pglabel{text-align:left;padding-top:0;flex:none}
   .mtab{padding:8px 11px;font-size:12px}
   .pgitems{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pgflat{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 .picker button{font-family:var(--mono);font-size:12px;letter-spacing:.04em;background:var(--panel2);
   color:var(--muted);border:1px solid var(--line);padding:9px 14px;border-radius:2px;cursor:pointer;transition:.15s}
@@ -386,12 +399,22 @@ function detectPullback(candles){
   const volumeContraction=avgVolSince<avgVolBase*0.85;
 
   const yesterday=win.at(-2);
+  const sinceExclToday=since.slice(0,-1).map(c=>c.volume);
   const reboundToday=today.close>yesterday.close&&
-    today.volume>mean(since.slice(0,-1).map(c=>c.volume)||[today.volume])*1.15;
+    today.volume>(sinceExclToday.length?mean(sinceExclToday):today.volume)*1.15;
+
+  /* breakdown은 세 조건 중 하나만 걸려도 발동한다.
+     화면 문구가 "20일선 하회"처럼 고정 문장을 쓰면, 실제로는 20일선을
+     멀쩡히 지키고 있는데도(하락폭·기간만 걸린 경우) 사실과 다른 말을
+     하게 된다. 그래서 어떤 조건이 실제로 참인지 근거를 남긴다. */
+  const reasons=[];
+  if(!supportHeld)reasons.push('support');
+  if(dropPct>18)reasons.push('drop');
+  if(daysElapsed>15)reasons.push('duration');
 
   let state;
-  if(!supportHeld||dropPct>18||daysElapsed>15)
-    state='breakdown';               // 눌림이 아니라 지지가 무너진 것으로 판단
+  if(reasons.length)
+    state='breakdown';
   else if(dropPct<2)
     state='watching';                // 고점 근처, 아직 눌림이라 부르기 이름
   else if(reboundToday)
@@ -399,7 +422,7 @@ function detectPullback(candles){
   else
     state='active';                  // 조정 진행 중, 지지 유지
 
-  return{state,daysElapsed,dropPct,volumeContraction,supportHeld,
+  return{state,daysElapsed,dropPct,volumeContraction,supportHeld,reasons,
     peakDate:peak.date,peakClose:peak.close,todayClose:today.close,ma20:Math.round(ma20)};
 }
 
@@ -1166,10 +1189,35 @@ const PB_COPY={
     head:v=>`${v.daysElapsed}일 만에 거래량 동반 반등`,
     body:'조정이 끝나가는 국면일 수 있습니다. 다만 하루 반등만으로 단정하기는 이르니, '+
          '다음 1~2일 더 거래량이 붙으며 오르는지 확인한 뒤 판단해도 늦지 않습니다.'},
-  breakdown:{badge:'지지 이탈 — 눌림 아님',tone:'down',
-    head:v=>`고점 대비 -${v.dropPct}% · 20일선 하회`,
-    body:'이건 정상적인 눌림이 아니라 <b>지지가 무너진 것</b>으로 보입니다. '+
-         '눌림목을 노리고 접근할 자리가 아니며, 신규 진입은 보류하는 편이 안전합니다.'},
+  breakdown:{tone:'down',
+    badge:v=>v.reasons.includes('support')?'지지 이탈 — 눌림 아님'
+           :v.reasons.includes('drop')?'낙폭 과다 — 눌림 아님'
+           :'장기화 — 눌림 전제 이탈',
+    head:v=>{
+      const facts=[`고점 대비 -${v.dropPct}%`];
+      if(v.reasons.includes('support'))facts.push('20일선 하회');
+      if(v.reasons.includes('duration'))facts.push(`${v.daysElapsed}거래일째 지속`);
+      return facts.join(' · ');
+    },
+    body:v=>{
+      // 실제로 참인 근거만 나열한다. 걸리지 않은 조건은 절대 언급하지 않는다.
+      const facts=[];
+      if(v.reasons.includes('support'))
+        facts.push(`20일선(${v.ma20.toLocaleString()}) 아래로 종가가 내려왔습니다`);
+      if(v.reasons.includes('drop'))
+        facts.push(`고점 대비 하락폭이 ${v.dropPct}%로 눌림치고는 큽니다`);
+      if(v.reasons.includes('duration'))
+        facts.push(`조정이 ${v.daysElapsed}거래일째로 길어져, 통상적인 눌림(3~10거래일)의 범위를 벗어났습니다`);
+
+      const onlyDuration=v.reasons.length===1&&v.reasons[0]==='duration';
+      const conclusion=v.reasons.includes('support')
+        ? '지지선이 실제로 무너진 것으로 보여, 눌림목을 노리고 접근할 자리가 아닙니다. 신규 진입은 보류하는 편이 안전합니다.'
+        : onlyDuration
+          ? '20일선은 아직 지키고 있지만, 조정이 예상보다 길어지고 있어 짧은 눌림이라는 전제 자체가 흔들립니다. 매집 근거가 여전히 유효한지 다시 확인해보세요.'
+          : '지지선은 지키고 있지만 하락폭이 커서, 정상적인 눌림보다는 분위기가 바뀌는 구간일 가능성이 있습니다. 신규 진입은 서두르지 마세요.';
+
+      return `${facts.map(f=>`<b>${f}</b>`).join('. ')}. ${conclusion}`;
+    }},
   none:{badge:'고점 경신 중',tone:'up',
     head:()=>'지금이 최근 20일 중 고점입니다',
     body:'이미 오른 자리를 추격하면 눌림목 전략의 장점이 사라집니다. '+
@@ -1184,6 +1232,7 @@ function renderPullback(candles,score){
   const c=PB_COPY[r.state];
   const bodyText=typeof c.body==='function'?c.body(r):c.body;
   const headText=c.head(r);
+  const badgeText=typeof c.badge==='function'?c.badge(r):c.badge;
 
   // 경과일 점 표시기 — 전형적인 눌림 구간(3~10거래일)을 기준으로 채운다
   // 'none'(고점 당일)은 아직 경과가 없어 점을 보여줄 이유가 없다
@@ -1196,7 +1245,7 @@ function renderPullback(candles,score){
   box.className='pullback pb-'+c.tone+(r.state==='active'?' pb-strong':'');
   box.innerHTML=`
     <div class="pbhead">
-      <span class="pbbadge">${c.badge}</span>
+      <span class="pbbadge">${badgeText}</span>
       ${['active','ending','breakdown'].includes(r.state)?`<span class="pbdays">${r.daysElapsed}일째</span>`:''}
     </div>
     <p class="pbline">${headText}</p>
@@ -1320,6 +1369,18 @@ function renderTabs(){
 
 function renderPicker(){
   const list=ASSETS.filter(a=>a.market===curMarket);
+
+  /* 암호화폐는 섹터마다 코인이 1개뿐이라, 주식처럼 섹터별로 줄을 나누면
+     한 줄에 하나씩 10줄이 세로로 길게 늘어진다. 그래서 섹터 구분 없이
+     하나의 그리드에 흘려 넣고, 섹터명은 버튼 안에 작은 부제로만 넣는다. */
+  if(curMarket==='crypto'){
+    picker.innerHTML=`<div class="pgflat">`+list.map(a=>
+      `<button data-id="${a.id}" aria-pressed="${a.id===current.id}" class="pgflatbtn">`+
+      `<span class="pfname">◆ ${a.name}</span><span class="pfsec">${a.sector}</span></button>`
+    ).join('')+`</div>`;
+    return;
+  }
+
   const bySector=[];
   list.forEach(a=>{
     let g=bySector.find(x=>x[0]===a.sector);
